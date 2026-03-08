@@ -1,0 +1,19 @@
+intTransport:
+  server: api.armlab.pro:4222
+  tls:
+    crtFile: ./cert/viva-api/tls.crt
+    keyFile: ./cert/viva-api/tls.key
+    caFile: ./cert/viva-api/ca.crt
+extTransport:
+  server: 0.0.0.0:4000
+  secret:
+    - TestSecretKey
+smpp:
+  endpoint: ["217.76.1.74:2775", "217.76.1.86:2775"]
+  auth:
+    user: SafeKids
+    password: pass123
+  template: |-
+    {{.ProductName}}{{ if .Quantity }} for {{ pluralizeEn .Quantity "device" "devices" }}{{ end }}
+    Activation code: {{.ActivationCode}}
+    Download link: {{.DownloadURL}}

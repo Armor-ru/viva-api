@@ -1,0 +1,33 @@
+@host = http://localhost:4000
+@secret = TestSecretKey
+@signature = c99717d326116bc080abf341d2d3f899713b77a4d398b5be87a571f4d8dc714a
+
+### ActivationRequest
+POST {{host}}/ExtAppPartneerProductActivationRequest
+Content-Type: application/json
+X-Signature: {{signature}}
+
+{
+  "phoneNum": "37477600552",
+  "productCode": "98e226fe-ce64-5ccb-885f-a5f9b2d77cc5"
+}
+
+### Activation
+POST {{host}}/ExtAppPartneerProductActivation
+Content-Type: application/json
+X-Signature: {{signature}}
+
+{
+  "phoneNum": "37477600552",
+  "productCode": "98e226fe-ce64-5ccb-885f-a5f9b2d77cc5"
+}
+
+### Remove
+POST {{host}}/ExtAppPartneerProductRemove
+Content-Type: application/json
+X-Signature: {{signature}}
+
+{
+  "phoneNum": "37477600552",
+  "productCode": "98e226fe-ce64-5ccb-885f-a5f9b2d77cc5"
+}
