@@ -5,4 +5,4 @@ run:
 build:
 	GOOS=linux
 	go mod download
-	go build -o ./.dist/viva-api ./cmd/viva-api/main.go
+	go build -o ./.dist/api ./cmd/viva-api/main.go
