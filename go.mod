@@ -4,7 +4,7 @@ go 1.26.1
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/Armor-ru/sds-go v1.0.5 // indirect
+	github.com/Armor-ru/sds-go v1.0.8 // indirect
 	github.com/andybalholm/brotli v1.0.5 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect

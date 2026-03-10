@@ -48,6 +48,8 @@ github.com/Armor-ru/sds-go v1.0.4 h1:B0dt46E3iz3shG3plE/N2lt9GodfvMSp8hjuYKf4qNk
 github.com/Armor-ru/sds-go v1.0.4/go.mod h1:YkfSxfZ60x8BTh0npQjOqQhLc84TICSTQpywxmQ4dnY=
 github.com/Armor-ru/sds-go v1.0.5 h1:DguugzT8LYPivKtDOzr+GVpY5mnJEIyfZ1XsoW1MLGw=
 github.com/Armor-ru/sds-go v1.0.5/go.mod h1:YkfSxfZ60x8BTh0npQjOqQhLc84TICSTQpywxmQ4dnY=
+github.com/Armor-ru/sds-go v1.0.8 h1:U0o9ZMgfIpnGdHSSID0C/wkMAIPo9qnV5wghDKgLhew=
+github.com/Armor-ru/sds-go v1.0.8/go.mod h1:YkfSxfZ60x8BTh0npQjOqQhLc84TICSTQpywxmQ4dnY=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
 github.com/BurntSushi/xgb v0.0.0-20160522181843-27f122750802/go.mod h1:IVnqGOEym/WlBOVXweHU+Q+/VP0lqqI8lqeDx9IjBqo=
 github.com/andybalholm/brotli v1.0.5 h1:8uQZIdzKmjc/iuPu7O2ioW48L81FgatrcpfFmiq/cCs=

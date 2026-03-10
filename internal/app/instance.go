@@ -134,17 +134,18 @@ func (s *Viva) onCompletedHandler(ctx types.HandlerContext) {
 
 	item := order.Items[0]
 
-	if item.Artifacts.ActivationCode == "" {
+	if item.Artifacts["ActivationCode"] == "" {
 		logger.Error().Str("orderId", order.ID).Msg("can not send notify, ActivationCode is empty")
 		return
 	}
 
-	if len(item.Artifacts.Download) == 0 {
+	downloads := item.Artifacts["Download"].([]map[string]any)
+	if len(downloads) == 0 {
 		logger.Error().Str("orderId", order.ID).Msg("can not send notify, artifacts download not found")
 		return
 	}
 
-	downloadURL := strings.TrimSpace(item.Artifacts.Download[0].Url)
+	downloadURL := strings.TrimSpace(downloads[0]["Url"].(string))
 	if downloadURL == "" {
 		logger.Error().Str("orderId", order.ID).Msg("can not send notify, DownloadURL is empty")
 		return
@@ -159,7 +160,7 @@ func (s *Viva) onCompletedHandler(ctx types.HandlerContext) {
 	smsData := SmsData{
 		ProductName:    productName,
 		Quantity:       0,
-		ActivationCode: item.Artifacts.ActivationCode,
+		ActivationCode: item.Artifacts["ActivationCode"].(string),
 		DownloadURL:    downloadURL,
 	}
 
