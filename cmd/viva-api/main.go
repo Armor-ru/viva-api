@@ -25,6 +25,7 @@ type Conf struct {
 	SMPP        viva_api.SmppConfig `yaml:"smpp"`
 	TestTariffs []string            `yaml:"testTariffs"`
 	Channels    viva_api.Channels   `yaml:"channels"`
+	AccountId   string              `yaml:"accountId"`
 }
 
 func init() {
@@ -64,6 +65,7 @@ func main() {
 		viva_api.WithExtTransport(http),
 		viva_api.WithSecrets(cfg.ExtTransport.Secret),
 		viva_api.WithSmppConfig(cfg.SMPP),
+		viva_api.WithAccountId(cfg.AccountId),
 	)
 
 	nats.ConnectAndWait()

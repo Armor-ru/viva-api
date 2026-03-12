@@ -17,3 +17,5 @@ smpp:
     {{.ProductName}}{{ if .Quantity }} for {{ pluralizeEn .Quantity "device" "devices" }}{{ end }}
     Activation code: {{.ActivationCode}}
     Download link: {{.DownloadURL}}
+
+accountId: 923e0af7-8c92-4078-b9e5-0894d4efc4f8

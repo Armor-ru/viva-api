@@ -10,6 +10,7 @@ import (
 	"github.com/Armor-ru/sds-go/pkg/tplext"
 	httpTransport "github.com/Armor-ru/sds-go/pkg/transport/http"
 	"github.com/Armor-ru/sds-go/pkg/types"
+	"github.com/google/uuid"
 
 	"github.com/spf13/cast"
 )
@@ -26,6 +27,8 @@ type Viva struct {
 
 	SmsTpl     *template.Template
 	smppSender *SmppSender
+
+	accountId string
 }
 
 func (s *Viva) InitHandlers() {
@@ -77,20 +80,31 @@ func (s *Viva) handleCreate(ctx types.HandlerContext, orderType types.OrderType)
 	data := ExtReq{}
 	ctx.Data(&data)
 
+	// Даные для заказа
 	phone := data.PhoneNum
 	externalID := data.ProductCode
+	orderId := uuid.NewSHA1(uuid.MustParse(s.accountId), []byte(externalID+":"+phone)).String()
+
+	// Наполнение items для новых и orderId для старых заказов
+	var items []types.OrderItemRequest
+	if orderType == types.OrderTypeNew {
+		items = append(items, types.OrderItemRequest{
+			Id:         uuid.NewString(),
+			ExternalId: &externalID,
+		})
+	}
+
+	// Формируем тело заказа
 	newOrder := types.OrderCreateRequest{
+		Id:   orderId,
 		Type: orderType,
 		Fields: types.JSON{
 			"phone": phone,
 		},
-		Items: []types.OrderItemRequest{
-			{
-				ExternalId: &externalID,
-			},
-		},
+		Items: items,
 	}
 
+	// Создаем заказ
 	_, err := s.intTransport.Send("order/create", newOrder, types.SendOptions{
 		Timeout: 3 * time.Second,
 	})
@@ -134,38 +148,51 @@ func (s *Viva) onCompletedHandler(ctx types.HandlerContext) {
 
 	item := order.Items[0]
 
-	if item.Artifacts["ActivationCode"] == "" {
+	activationCode := strings.TrimSpace(cast.ToString(item.Artifacts["ActivationCode"]))
+	if activationCode == "" {
 		logger.Error().Str("orderId", order.ID).Msg("can not send notify, ActivationCode is empty")
 		return
 	}
 
-	downloads := item.Artifacts["Download"].([]map[string]any)
+	// Raw Download
+	rawDownload, ok := item.Artifacts["download"].([]interface{})
+	if !ok {
+		rawDownload = []interface{}{}
+	}
+
+	// download convert
+	downloads := make([]map[string]interface{}, 0, len(rawDownload))
+	for _, v := range rawDownload {
+		if m, ok := v.(map[string]interface{}); ok {
+			downloads = append(downloads, m)
+		}
+	}
+
 	if len(downloads) == 0 {
 		logger.Error().Str("orderId", order.ID).Msg("can not send notify, artifacts download not found")
 		return
 	}
 
-	downloadURL := strings.TrimSpace(downloads[0]["Url"].(string))
+	downloadURL := strings.TrimSpace(cast.ToString(downloads[0]["url"]))
 	if downloadURL == "" {
 		logger.Error().Str("orderId", order.ID).Msg("can not send notify, DownloadURL is empty")
 		return
 	}
 
-	productName := cast.ToString(item.Product.Name)
-	if productName == "" {
-		logger.Error().Str("orderId", order.ID).Msg("can not send notify, product name is empty")
-		return
-	}
+	// productName := cast.ToString(item.Product.Name)
+	// if productName == "" {
+	// 	logger.Error().Str("orderId", order.ID).Msg("can not send notify, product name is empty")
+	// }
 
 	smsData := SmsData{
-		ProductName:    productName,
+		ProductName:    cast.ToString(item.Product.Name),
 		Quantity:       0,
-		ActivationCode: item.Artifacts["ActivationCode"].(string),
+		ActivationCode: activationCode,
 		DownloadURL:    downloadURL,
 	}
 
-	if item.Options["quantity"] != nil {
-		smsData.Quantity = cast.ToInt(item.Options["quantity"])
+	if quantity, ok := item.Options["quantity"]; ok {
+		smsData.Quantity = cast.ToInt(quantity)
 	}
 
 	var smsMessage bytes.Buffer

@@ -34,3 +34,9 @@ func WithSmppConfig(config SmppConfig) func(*Viva) {
 		s.smpp = config
 	}
 }
+
+func WithAccountId(accountId string) func(*Viva) {
+	return func(s *Viva) {
+		s.accountId = accountId
+	}
+}
