@@ -2,6 +2,7 @@ package viva_api
 
 import (
 	"errors"
+	"fmt"
 	"math/rand"
 	"time"
 
@@ -10,45 +11,59 @@ import (
 )
 
 type SmppSender struct {
-    cfg SmppConfig
+	cfg SmppConfig
 }
 
 func NewSmppSender(cfg SmppConfig) *SmppSender {
-    return &SmppSender{cfg: cfg}
+	return &SmppSender{cfg: cfg}
 }
 
-func (s *SmppSender) Send(msisdn, message string) error {
-    if len(s.cfg.Endpoint) == 0 {
-        return errors.New("smpp endpoint is empty")
-    }
-    if s.cfg.Auth.User == "" || s.cfg.Auth.Password == "" {
-        return errors.New("smpp auth user or password is empty")
-    }
+func (s *SmppSender) Send(msisdn, message string) (err error) {
+	if len(s.cfg.Endpoint) == 0 {
+		return errors.New("smpp endpoint is empty")
+	}
+	if s.cfg.Auth.User == "" || s.cfg.Auth.Password == "" {
+		return errors.New("smpp auth user or password is empty")
+	}
 
-    r := rand.New(rand.NewSource(time.Now().UnixNano()))
-    endpoint := s.cfg.Endpoint[r.Intn(len(s.cfg.Endpoint))]
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	endpoint := s.cfg.Endpoint[r.Intn(len(s.cfg.Endpoint))]
 
-    tx := &smpp.Transceiver{
-        Addr:   endpoint,
-        User:   s.cfg.Auth.User,
-        Passwd: s.cfg.Auth.Password,
-    }
+	// дополняем ошибку 
+	defer func() {
+		if err != nil {
+			err = fmt.Errorf(
+				"smpp send failed: endpoint=%s msisdn=%s message_len=%d: %w",
+				endpoint,
+				msisdn,
+				len(message),
+				err,
+			)
+		}
+	}()
 
-    conn := tx.Bind()
-    defer tx.Close()
+	tx := &smpp.Transceiver{
+		Addr:   endpoint,
+		User:   s.cfg.Auth.User,
+		Passwd: s.cfg.Auth.Password,
+	}
 
-    select {
-    case st := <-conn:
-        if st.Error() != nil {
-            return st.Error()
-        }
-    case <-time.After(5 * time.Second):
-        return errors.New("smpp bind timeout")
-    }
+	conn := tx.Bind()
+	defer tx.Close()
 
-    _, err := tx.Submit(&smpp.ShortMessage{
-        Dst:  msisdn,
-        Text: pdutext.Raw(message),
-    })
-    return err
+	select {
+	case st := <-conn:
+		if st.Error() != nil {
+			return st.Error()
+		}
+	case <-time.After(5 * time.Second):
+		return errors.New("smpp bind timeout")
+	}
+
+	_, err = tx.Submit(&smpp.ShortMessage{
+		Dst:  msisdn,
+		Text: pdutext.Raw(message),
+	})
+
+	return
 }
