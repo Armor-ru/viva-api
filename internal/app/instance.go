@@ -46,10 +46,9 @@ func (s *Viva) InitHandlers() {
 
 	tplText := s.smpp.Template
 	if tplText == "" {
-		tplText =
-			"{{.ProductName}}{{ if .Quantity }} for {{ pluralizeEn .Quantity \"device\" \"devices\" }}{{ end }}\n" +
-				"Activation code: {{.ActivationCode}}\n" +
-				"Download link: {{.DownloadURL}}"
+		tplText = "{{.ProductName}}{{ if .Quantity }} for {{ pluralizeEn .Quantity \"device\" \"devices\" }}{{ end }}\n" +
+			"Activation code: {{.ActivationCode}}\n" +
+			"Download link: {{.DownloadURL}}"
 	}
 	SmsTpl, _ := template.New("sms").Funcs(tplext.Funcs).Parse(tplText)
 	s.SmsTpl = SmsTpl
@@ -108,7 +107,6 @@ func (s *Viva) handleCreate(ctx types.HandlerContext, orderType types.OrderType)
 	_, err := s.intTransport.Send("order/create", newOrder, types.SendOptions{
 		Timeout: 3 * time.Second,
 	})
-
 	if err != nil {
 		logger.Error().Interface("payload", newOrder).Msg("can not create order, " + err.Error())
 		return
@@ -215,8 +213,17 @@ func (s *Viva) onCompletedHandler(ctx types.HandlerContext) {
 
 	logger.Info().Str("orderId", order.ID).Str("phone", phone).Str("text", smsMessage.String()).Msg("send notify with activation code and download link")
 
+	// Разделяем данные для grafana
 	if err := s.smppSender.Send(phone, smsMessage.String()); err != nil {
-		logger.Error().Str("orderId", order.ID).Msg("send smpp notify failed, " + err.Error())
+		smppErr := err.(*SmppError)
+
+		log := logger.Error().Str("orderId", order.ID)
+
+		for k, v := range smppErr.Fields {
+			log = log.Interface(k, v)
+		}
+
+		log.Msg("send smpp notify failed, " + err.Error())
 		return
 	}
 
