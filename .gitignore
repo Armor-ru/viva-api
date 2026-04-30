@@ -1,0 +1,8 @@
+.dist/
+*.exe
+vendor/
+.idea/
+.vscode/
+cert/*
+!cert/README.txt
+*.log
