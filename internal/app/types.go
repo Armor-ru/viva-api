@@ -22,6 +22,7 @@ type SmppConfig struct {
 type ExtReq struct {
 	PhoneNum    string `json:"phoneNum" validate:"required"`
 	ProductCode string `json:"productCode" validate:"required"`
+	SmsScenario string `json:"smsScenario,omitempty"`
 }
 
 type SmsData struct {
