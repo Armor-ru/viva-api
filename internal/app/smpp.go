@@ -8,7 +8,6 @@ import (
 	"github.com/fiorix/go-smpp/smpp/pdu/pdutext"
 )
 
-// Error
 type SmppError struct {
 	Message string
 	Err     error
@@ -26,7 +25,6 @@ func (e *SmppError) Unwrap() error {
 	return e.Err
 }
 
-// SMPP
 type SmppSender struct {
 	cfg SmppConfig
 }
