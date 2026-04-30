@@ -1,15 +1,15 @@
 package viva_api
 
 import (
-	"bytes"
 	"strings"
 	"text/template"
 	"time"
 
 	"github.com/Armor-ru/sds-go/pkg/logger"
 	"github.com/Armor-ru/sds-go/pkg/tplext"
-	httpTransport "github.com/Armor-ru/sds-go/pkg/transport/http"
+	httpt "github.com/Armor-ru/sds-go/pkg/transport/http"
 	"github.com/Armor-ru/sds-go/pkg/types"
+	"github.com/gofiber/fiber/v2"
 	"github.com/google/uuid"
 
 	"github.com/spf13/cast"
@@ -28,6 +28,11 @@ type Viva struct {
 	SmsTpl     *template.Template
 	smppSender *SmppSender
 
+	vivaPartner        PartnerSubscriptionAPI
+	defaultProductName string
+	// orderProductCode — externalId для order/create (тот же UUID, что productCode во вебхуке ActivationRequest).
+	orderProductCode string
+
 	accountId string
 }
 
@@ -38,6 +43,11 @@ func (s *Viva) InitHandlers() {
 		s.extTransport.Subscribe("POST /ExtAppPartneerProductActivationRequest", s.ExtAppPartnerProductActivationRequestHandler)
 		s.extTransport.Subscribe("POST /ExtAppPartneerProductActivation", s.ExtAppPartnerProductActivationHandler)
 		s.extTransport.Subscribe("POST /ExtAppPartneerProductRemove", s.ExtAppPartnerProductRemoveHandler)
+
+		s.extTransport.Subscribe("POST /landing/init-subscription", s.LandingInitSubscriptionHandler)
+		s.extTransport.Subscribe("POST /landing/confirm-subscription", s.LandingConfirmSubscriptionHandler)
+		s.extTransport.Subscribe("GET /landing/subscriber-info/:phoneNum", s.LandingGetSubscriberInfoGETHandler)
+		s.extTransport.Subscribe("POST /landing/subscriber-info", s.LandingGetSubscriberInfoPOSTHandler)
 	}
 
 	if s.intTransport != nil {
@@ -57,10 +67,18 @@ func (s *Viva) InitHandlers() {
 }
 
 func (s *Viva) initMiddleWare() {
-	s.extTransport.Middleware(httpTransport.Signature(httpTransport.SignatureConfig{
-		Secrets: s.secrets,
-		Header:  "X-Signature",
-	}))
+	ht, ok := s.extTransport.(*httpt.Transport)
+	sig := httpt.Signature(httpt.SignatureConfig{Secrets: s.secrets, Header: "X-Signature"})
+	if !ok {
+		logger.Warn().Msg("extTransport is not *http.Transport; webhook signature middleware skipped")
+		return
+	}
+	ht.Middleware(func(c *fiber.Ctx) error {
+		if strings.HasPrefix(c.Path(), "/landing/") {
+			return c.Next()
+		}
+		return sig(c)
+	})
 }
 
 func (s *Viva) ExtAppPartnerProductActivationRequestHandler(ctx types.HandlerContext) {
@@ -78,13 +96,29 @@ func (s *Viva) ExtAppPartnerProductRemoveHandler(ctx types.HandlerContext) {
 func (s *Viva) handleCreate(ctx types.HandlerContext, orderType types.OrderType) {
 	data := ExtReq{}
 	ctx.Data(&data)
+	s.sendOrderCreate(orderType, data.PhoneNum, data.ProductCode, data.SmsScenario)
+	_ = ctx.Response("")
+}
 
-	// Даные для заказа
-	phone := data.PhoneNum
-	externalID := data.ProductCode
+// sendOrderCreate шлёт order/create в NATS (как обработчик вебхука ExtAppPartneerProductActivationRequest и др.).
+func (s *Viva) sendOrderCreate(orderType types.OrderType, phone, externalID, smsScenario string) {
+	if s.intTransport == nil {
+		logger.Warn().Msg("intTransport nil, skip order/create")
+		return
+	}
+	phone = strings.TrimSpace(phone)
+	externalID = strings.TrimSpace(externalID)
+	if externalID == "" {
+		logger.Warn().Str("phone", phone).Str("orderType", string(orderType)).Msg("skip order/create: productCode empty")
+		return
+	}
+	if phone == "" {
+		logger.Warn().Msg("skip order/create: phone empty")
+		return
+	}
+
 	orderId := uuid.NewSHA1(uuid.MustParse(s.accountId), []byte(externalID+":"+phone)).String()
 
-	// Наполнение items для новых и orderId для старых заказов
 	var items []types.OrderItemRequest
 	if orderType == types.OrderTypeNew {
 		items = append(items, types.OrderItemRequest{
@@ -93,17 +127,29 @@ func (s *Viva) handleCreate(ctx types.HandlerContext, orderType types.OrderType)
 		})
 	}
 
-	// Формируем тело заказа
+	wh := ""
+	switch orderType {
+	case types.OrderTypeNew:
+		wh = WHActivationReq
+	case types.OrderTypeRenew:
+		wh = WHActivation
+	case types.OrderTypeCancel:
+		wh = WHRemove
+	}
+
 	newOrder := types.OrderCreateRequest{
 		Id:   orderId,
 		Type: orderType,
 		Fields: types.JSON{
 			"phone": phone,
 		},
+		CustomData: types.JSON{
+			CDVivaWebhook:   wh,
+			CDSmsScenario: strings.TrimSpace(smsScenario),
+		},
 		Items: items,
 	}
 
-	// Создаем заказ
 	_, err := s.intTransport.Send("order/create", newOrder, types.SendOptions{
 		Timeout: 3 * time.Second,
 	})
@@ -111,8 +157,7 @@ func (s *Viva) handleCreate(ctx types.HandlerContext, orderType types.OrderType)
 		logger.Error().Interface("payload", newOrder).Msg("can not create order, " + err.Error())
 		return
 	}
-
-	ctx.Response("")
+	logger.Info().Str("orderId", orderId).Str("type", string(orderType)).Str("phone", phone).Msg("order/create sent")
 }
 
 func (s *Viva) onCompletedHandler(ctx types.HandlerContext) {
@@ -126,11 +171,38 @@ func (s *Viva) onCompletedHandler(ctx types.HandlerContext) {
 		return
 	}
 
+	phone := orderPhone(order)
+	if phone == "" {
+		logger.Error().Str("orderId", order.ID).Interface("fields", order.Fields).Msg("can not send notify, order has no phone")
+		return
+	}
+
+	wh := strings.TrimSpace(cast.ToString(order.CustomData[CDVivaWebhook]))
+	scenarioHint := strings.TrimSpace(cast.ToString(order.CustomData[CDSmsScenario]))
+
+	switch wh {
+	case WHActivation:
+		s.sendRenewSms(order, phone, scenarioHint)
+	case WHRemove:
+		s.sendRemoveSms(order, phone, scenarioHint)
+	default:
+		s.sendNewActivationSms(order, phone)
+	}
+}
+
+func orderPhone(order types.OrderResponse) string {
+	raw, ok := order.Fields["phone"]
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(cast.ToString(raw))
+}
+
+func (s *Viva) sendNewActivationSms(order types.OrderResponse, phone string) {
 	if len(order.Items) == 0 {
 		logger.Error().Str("orderId", order.ID).Msg("can not send notify, order items is empty")
 		return
 	}
-
 	hasSendSms := false
 	for _, it := range order.Items {
 		if it.Type == "activate" || it.Type == "reactivate" {
@@ -138,94 +210,83 @@ func (s *Viva) onCompletedHandler(ctx types.HandlerContext) {
 			break
 		}
 	}
-
 	if !hasSendSms {
 		logger.Info().Str("orderId", order.ID).Msg("no need to send notify with activation code")
 		return
 	}
 
 	item := order.Items[0]
-
 	activationCode := strings.TrimSpace(cast.ToString(item.Artifacts["ActivationCode"]))
 	if activationCode == "" {
 		logger.Error().Str("orderId", order.ID).Msg("can not send notify, ActivationCode is empty")
 		return
 	}
 
-	// Raw Download
 	rawDownload, ok := item.Artifacts["download"].([]interface{})
 	if !ok {
 		rawDownload = []interface{}{}
 	}
-
-	// download convert
 	downloads := make([]map[string]interface{}, 0, len(rawDownload))
 	for _, v := range rawDownload {
 		if m, ok := v.(map[string]interface{}); ok {
 			downloads = append(downloads, m)
 		}
 	}
-
 	if len(downloads) == 0 {
 		logger.Error().Str("orderId", order.ID).Msg("can not send notify, artifacts download not found")
 		return
 	}
-
 	downloadURL := strings.TrimSpace(cast.ToString(downloads[0]["url"]))
 	if downloadURL == "" {
 		logger.Error().Str("orderId", order.ID).Msg("can not send notify, DownloadURL is empty")
 		return
 	}
 
-	// productName := cast.ToString(item.Product.Name)
-	// if productName == "" {
-	// 	logger.Error().Str("orderId", order.ID).Msg("can not send notify, product name is empty")
-	// }
-
-	smsData := SmsData{
-		ProductName:    cast.ToString(item.Product.Name),
-		Quantity:       0,
-		ActivationCode: activationCode,
-		DownloadURL:    downloadURL,
+	payload := SmsScenarioPayload{
+		ProductLabel: cast.ToString(item.Product.Name),
+		LicenseKey:   activationCode,
+		DownloadURL:  downloadURL,
 	}
-
-	if quantity, ok := item.Options["quantity"]; ok {
-		smsData.Quantity = cast.ToInt(quantity)
-	}
-
-	var smsMessage bytes.Buffer
-	if err := s.SmsTpl.Execute(&smsMessage, smsData); err != nil {
-		logger.Error().Str("orderId", order.ID).Msg("render notify template failed, " + err.Error())
+	if err := s.smppSendScenario(phone, Sms2Welcome, payload); err != nil {
+		logger.Error().Str("orderId", order.ID).Err(err).Msg("SMPP sms2")
 		return
 	}
-
-	rawPhone, ok := order.Fields["phone"]
-	if !ok {
-		logger.Error().Str("orderId", order.ID).Interface("fields", order.Fields).Msg("can not send notify, order has no phone")
+	if err := s.smppSendScenario(phone, Sms3License, payload); err != nil {
+		logger.Error().Str("orderId", order.ID).Err(err).Msg("SMPP sms3")
 		return
 	}
+	logger.Info().Str("orderId", order.ID).Str("phone", phone).Msg("SPEC §8 sms2+sms3 sent")
+}
 
-	phone := strings.TrimSpace(cast.ToString(rawPhone))
-	if phone == "" {
-		logger.Error().Str("orderId", order.ID).Msg("can not send notify, phone is empty")
-		return
+func (s *Viva) sendRenewSms(order types.OrderResponse, phone, scenarioHint string) {
+	sc := Sms4Paid
+	switch SmsScenario(scenarioHint) {
+	case Sms5TrialRemind, Sms15Booster, Sms4Paid:
+		sc = SmsScenario(scenarioHint)
 	}
-
-	logger.Info().Str("orderId", order.ID).Str("phone", phone).Str("text", smsMessage.String()).Msg("send notify with activation code and download link")
-
-	// Разделяем данные для grafana
-	if err := s.smppSender.Send(phone, smsMessage.String()); err != nil {
-		smppErr := err.(*SmppError)
-
-		log := logger.Error().Str("orderId", order.ID)
-
-		for k, v := range smppErr.Fields {
-			log = log.Interface(k, v)
-		}
-
-		log.Msg("send smpp notify failed, " + err.Error())
-		return
+	payload := SmsScenarioPayload{ProductLabel: productLabelFromOrder(order)}
+	if sc == Sms5TrialRemind && order.EndTime != nil {
+		payload.TrialEndDate = order.EndTime.Format("02.01.2006")
 	}
+	if err := s.smppSendScenario(phone, sc, payload); err != nil {
+		logger.Error().Str("orderId", order.ID).Err(err).Str("scenario", string(sc)).Msg("SMPP renew webhook")
+	}
+}
 
-	logger.Info().Str("orderId", order.ID).Str("phone", phone).Msg("notify sent successfully")
+func (s *Viva) sendRemoveSms(order types.OrderResponse, phone, scenarioHint string) {
+	sc := SmsServiceRemoved
+	if SmsScenario(scenarioHint) == Sms14NoFunds {
+		sc = Sms14NoFunds
+	}
+	payload := SmsScenarioPayload{ProductLabel: productLabelFromOrder(order)}
+	if err := s.smppSendScenario(phone, sc, payload); err != nil {
+		logger.Error().Str("orderId", order.ID).Err(err).Str("scenario", string(sc)).Msg("SMPP remove webhook")
+	}
+}
+
+func productLabelFromOrder(order types.OrderResponse) string {
+	if len(order.Items) == 0 {
+		return ""
+	}
+	return cast.ToString(order.Items[0].Product.Name)
 }
