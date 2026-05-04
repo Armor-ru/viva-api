@@ -10,6 +10,4 @@ type PartnerSubscriptionAPI interface {
 	GetSubscriberInfo(ctx context.Context, msisdn string) (*vivaclient.GetSubInfoResponse, error)
 	InitSubscription(ctx context.Context, phoneNum, productName string) (*vivaclient.ResponseModel, error)
 	ConfirmSubscription(ctx context.Context, phoneNum, productName string, otp *string) (*vivaclient.ResponseModel, error)
-	RemoveSubscription(ctx context.Context, phoneNum, productName string) (*vivaclient.ResponseModel, error)
-	GetProductsByPhoneNum(ctx context.Context, phoneNum string) (*vivaclient.ExtAppProductsRespDTO, error)
 }

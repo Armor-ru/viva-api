@@ -19,22 +19,3 @@ type ResponseModel struct {
 	Message    interface{} `json:"message"`
 	Result     bool        `json:"result"`
 }
-
-type ExtAppProductDTO struct {
-	PhoneNumber string `json:"phoneNumber"`
-	ProductName string `json:"productName"`
-	ValidDays   int    `json:"validDays"`
-	ExpDate     string `json:"expDate"`
-}
-
-type ExtAppProductsRespDTO struct {
-	PhoneNumber              string             `json:"phoneNumber"`
-	ActiveSubscribedProducts []ExtAppProductDTO `json:"activeSubscribedProducts"`
-	AvailableProducts        []ExtAppProductDTO `json:"availableProducts"`
-}
-
-type extAppProductsEnvelope struct {
-	ResultCode int                   `json:"resultCode"`
-	Message    string                `json:"message"`
-	Result     *ExtAppProductsRespDTO `json:"result"`
-}

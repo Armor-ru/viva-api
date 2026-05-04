@@ -80,42 +80,6 @@ func (c *Client) bearer(ctx context.Context) (string, error) {
 	return c.token, nil
 }
 
-func (c *Client) doJSON(ctx context.Context, method, path string, body any, out any) error {
-	tok, err := c.bearer(ctx)
-	if err != nil {
-		return err
-	}
-	var rdr io.Reader
-	if body != nil {
-		b, err := json.Marshal(body)
-		if err != nil {
-			return err
-		}
-		rdr = bytes.NewReader(b)
-	}
-	req, err := http.NewRequestWithContext(ctx, method, c.base()+path, rdr)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", "Bearer "+tok)
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	raw, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("viva %s %s: status %d: %s", method, path, resp.StatusCode, string(raw))
-	}
-	if out == nil {
-		return nil
-	}
-	return json.Unmarshal(raw, out)
-}
-
 func subscriptionPostPath(path, phoneNum, productName string, otp *string) string {
 	q := url.Values{}
 	q.Set("phoneNum", strings.TrimSpace(phoneNum))
@@ -198,43 +162,4 @@ func (c *Client) ConfirmSubscription(ctx context.Context, phoneNum, productName 
 		return nil, err
 	}
 	return &out, nil
-}
-
-func (c *Client) RemoveSubscription(ctx context.Context, phoneNum, productName string) (*ResponseModel, error) {
-	path := subscriptionPostPath("/api/Subscription/RemoveSubscription", phoneNum, productName, nil)
-	var out ResponseModel
-	if err := c.doPostQuery(ctx, path, &out); err != nil {
-		return nil, err
-	}
-	return &out, nil
-}
-
-func (c *Client) GetProductsByPhoneNum(ctx context.Context, phoneNum string) (*ExtAppProductsRespDTO, error) {
-	tok, err := c.bearer(ctx)
-	if err != nil {
-		return nil, err
-	}
-	path := "/api/Subscription/GetProductsByPhoneNum?phoneNum=" + strings.TrimSpace(phoneNum)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base()+path, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+tok)
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	raw, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("viva GetProductsByPhoneNum: status %d: %s", resp.StatusCode, string(raw))
-	}
-	var env extAppProductsEnvelope
-	if err := json.Unmarshal(raw, &env); err != nil {
-		return nil, err
-	}
-	if env.Result == nil {
-		return &ExtAppProductsRespDTO{PhoneNumber: phoneNum}, nil
-	}
-	return env.Result, nil
 }
