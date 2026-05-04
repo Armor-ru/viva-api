@@ -21,145 +21,224 @@ type Config struct {
 	Password string
 }
 
+type TokenResponse struct {
+	AccessToken string `json:"accessToken"`
+	ExpiresIn   int    `json:"expiresIn"`
+}
+
 type Client struct {
-	http   *http.Client
-	cfg    Config
-	mu     sync.Mutex
-	token  string
-	expiry time.Time
+	http    *http.Client
+	baseURL string
+	auth    *tokenManager
 }
 
 func New(cfg Config) *Client {
-	return &Client{http: http.DefaultClient, cfg: cfg}
-}
-
-func (c *Client) base() string {
-	return strings.TrimRight(strings.TrimSpace(c.cfg.BaseURL), "/")
-}
-
-func (c *Client) bearer(ctx context.Context) (string, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if c.token != "" && time.Until(c.expiry) > renewSkew {
-		return c.token, nil
+	return &Client{
+		http:    http.DefaultClient,
+		baseURL: normalizeBaseURL(cfg.BaseURL),
+		auth:    newTokenManager(cfg.UserName, cfg.Password),
 	}
+}
+
+func normalizeBaseURL(raw string) string {
+	return strings.TrimRight(strings.TrimSpace(raw), "/")
+}
+
+type tokenManager struct {
+	mu       sync.Mutex
+	userName string
+	password string
+	token    string
+	expiry   time.Time
+}
+
+func newTokenManager(userName, password string) *tokenManager {
+	return &tokenManager{
+		userName: userName,
+		password: password,
+	}
+}
+
+func (tm *tokenManager) get(ctx context.Context, client *http.Client, baseURL string) (string, error) {
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
+
+	if tm.isValid() {
+		return tm.token, nil
+	}
+
+	token, err := tm.fetch(ctx, client, baseURL)
+	if err != nil {
+		return "", fmt.Errorf("fetch token: %w", err)
+	}
+
+	tm.token = token.AccessToken
+	tm.expiry = time.Now().Add(token.expiryDuration())
+	return tm.token, nil
+}
+
+func (tm *tokenManager) isValid() bool {
+	return tm.token != "" && time.Until(tm.expiry) > renewSkew
+}
+
+func (tm *tokenManager) fetch(ctx context.Context, client *http.Client, baseURL string) (*TokenResponse, error) {
 	body, err := json.Marshal(map[string]string{
-		"userName": c.cfg.UserName,
-		"password": c.cfg.Password,
+		"userName": tm.userName,
+		"password": tm.password,
 	})
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("marshal auth body: %w", err)
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.base()+"/auth/token", bytes.NewReader(body))
+
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		baseURL+"/auth/token",
+		bytes.NewReader(body),
+	)
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("create auth request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.http.Do(req)
+
+	resp, err := client.Do(req)
 	if err != nil {
-		return "", err
+		return nil, fmt.Errorf("execute auth request: %w", err)
 	}
 	defer resp.Body.Close()
-	raw, _ := io.ReadAll(resp.Body)
+
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read auth response: %w", err)
+	}
+
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("viva auth: status %d: %s", resp.StatusCode, string(raw))
+		return nil, fmt.Errorf("viva auth: status %d: %s", resp.StatusCode, string(raw))
 	}
-	var tr tokenResponse
+
+	var tr TokenResponse
 	if err := json.Unmarshal(raw, &tr); err != nil {
-		return "", err
+		return nil, fmt.Errorf("unmarshal token response: %w", err)
 	}
+
 	if tr.AccessToken == "" {
-		return "", fmt.Errorf("viva auth: empty access_token")
+		return nil, fmt.Errorf("viva auth: empty access_token")
 	}
-	c.token = tr.AccessToken
-	ttl := time.Duration(tr.ExpiresIn) * time.Second
-	if ttl <= 0 {
-		ttl = time.Hour
-	}
-	c.expiry = time.Now().Add(ttl)
-	return c.token, nil
+
+	return &tr, nil
 }
 
-func subscriptionPostPath(path, phoneNum, productName string, otp *string) string {
+func (tr TokenResponse) expiryDuration() time.Duration {
+	if tr.ExpiresIn <= 0 {
+		return time.Hour // дефолтное значение
+	}
+	return time.Duration(tr.ExpiresIn) * time.Second
+}
+
+// --- HTTP-методы клиента ---
+
+// do выполняет HTTP-запрос с авторизацией и парсингом ответа
+func (c *Client) do(ctx context.Context, method, path string, body io.Reader, out interface{}) error {
+	token, err := c.auth.get(ctx, c.http, c.baseURL)
+	if err != nil {
+		return fmt.Errorf("get auth token: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, body)
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return fmt.Errorf("execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	raw, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("read response: %w", err)
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return &Error{
+			StatusCode: resp.StatusCode,
+			Message:    string(raw),
+			Path:       path,
+		}
+	}
+
+	if out == nil {
+		return nil
+	}
+
+	if err := json.Unmarshal(raw, out); err != nil {
+		return fmt.Errorf("unmarshal response: %w", err)
+	}
+
+	return nil
+}
+
+// --- Бизнес-методы (теперь они становятся очень простыми) ---
+
+func (c *Client) GetSubscriberInfo(ctx context.Context, msisdn string) (*GetSubInfoResponse, error) {
+	path := fmt.Sprintf("/api/Subscriber/%s", strings.TrimSpace(msisdn))
+
+	var out GetSubInfoResponse
+	if err := c.do(ctx, http.MethodGet, path, nil, &out); err != nil {
+		return nil, fmt.Errorf("get subscriber info: %w", err)
+	}
+
+	return &out, nil
+}
+
+func (c *Client) InitSubscription(ctx context.Context, phoneNum, productName string) (*ResponseModel, error) {
+	path := subscriptionPath("/api/Subscription/InitSubscription", phoneNum, productName, nil)
+
+	var out ResponseModel
+	if err := c.do(ctx, http.MethodPost, path, nil, &out); err != nil {
+		return nil, fmt.Errorf("init subscription: %w", err)
+	}
+
+	return &out, nil
+}
+
+func (c *Client) ConfirmSubscription(ctx context.Context, phoneNum, productName string, otp *string) (*ResponseModel, error) {
+	path := subscriptionPath("/api/Subscription/ConfirmSubscription", phoneNum, productName, otp)
+
+	var out ResponseModel
+	if err := c.do(ctx, http.MethodPost, path, nil, &out); err != nil {
+		return nil, fmt.Errorf("confirm subscription: %w", err)
+	}
+
+	return &out, nil
+}
+
+// --- Вспомогательные функции ---
+
+func subscriptionPath(basePath, phoneNum, productName string, otp *string) string {
 	q := url.Values{}
 	q.Set("phoneNum", strings.TrimSpace(phoneNum))
 	q.Set("productName", strings.TrimSpace(productName))
 	if otp != nil {
 		q.Set("otp", strings.TrimSpace(*otp))
 	}
-	return path + "?" + q.Encode()
+	return basePath + "?" + q.Encode()
 }
 
-func (c *Client) doPostQuery(ctx context.Context, pathWithQuery string, out any) error {
-	tok, err := c.bearer(ctx)
-	if err != nil {
-		return err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.base()+pathWithQuery, nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", "Bearer "+tok)
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	raw, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("viva POST %s: status %d: %s", strings.Split(pathWithQuery, "?")[0], resp.StatusCode, string(raw))
-	}
-	if out == nil {
-		return nil
-	}
-	return json.Unmarshal(raw, out)
+// Error — кастомная ошибка для HTTP-ответов с неправильным статусом
+type Error struct {
+	StatusCode int
+	Message    string
+	Path       string
 }
 
-func (c *Client) GetSubscriberInfo(ctx context.Context, msisdn string) (*GetSubInfoResponse, error) {
-	tok, err := c.bearer(ctx)
-	if err != nil {
-		return nil, err
-	}
-	path := fmt.Sprintf("/api/Subscriber/%s", strings.TrimSpace(msisdn))
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base()+path, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+tok)
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	raw, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("viva subscriber not found")
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("viva GET subscriber: status %d: %s", resp.StatusCode, string(raw))
-	}
-	var out GetSubInfoResponse
-	if err := json.Unmarshal(raw, &out); err != nil {
-		return nil, err
-	}
-	return &out, nil
+func (e *Error) Error() string {
+	return fmt.Sprintf("viva %s: status %d: %s", e.Path, e.StatusCode, e.Message)
 }
 
-func (c *Client) InitSubscription(ctx context.Context, phoneNum, productName string) (*ResponseModel, error) {
-	path := subscriptionPostPath("/api/Subscription/InitSubscription", phoneNum, productName, nil)
-	var out ResponseModel
-	if err := c.doPostQuery(ctx, path, &out); err != nil {
-		return nil, err
-	}
-	return &out, nil
-}
-
-func (c *Client) ConfirmSubscription(ctx context.Context, phoneNum, productName string, otp *string) (*ResponseModel, error) {
-	path := subscriptionPostPath("/api/Subscription/ConfirmSubscription", phoneNum, productName, otp)
-	var out ResponseModel
-	if err := c.doPostQuery(ctx, path, &out); err != nil {
-		return nil, err
-	}
-	return &out, nil
+func (e *Error) IsNotFound() bool {
+	return e.StatusCode == http.StatusNotFound
 }

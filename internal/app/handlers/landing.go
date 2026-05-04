@@ -16,7 +16,9 @@ import (
 	"github.com/Armor-ru/sds-go/pkg/types"
 )
 
-var landingMSISDNHeaderNames = []string{
+const requestTimeout = 25 * time.Second
+
+var msisdnHeaderNames = []string{
 	"X-MSISDN",
 	"X-Msisdn",
 	"X-Phone-Number",
@@ -40,289 +42,307 @@ type landingConfirmBody struct {
 	Locale      string `json:"locale,omitempty"`
 }
 
-func landingInitSubscriptionHandler(v *viva_api.Viva) func(types.HandlerContext) {
-	return func(ctx types.HandlerContext) {
-		runLandingInit(v, ctx, "")
-	}
-}
-
-func landingInitSubscriptionLocalizedHandler(v *viva_api.Viva) func(types.HandlerContext) {
-	return func(ctx types.HandlerContext) {
-		runLandingInit(v, ctx, ctx.Param("locale"))
-	}
-}
-
-func runLandingInit(v *viva_api.Viva, ctx types.HandlerContext, pathLocale string) {
-	if !ensureVivaPartner(v, ctx) {
-		return
-	}
-	var body landingInitBody
-	ctx.Data(&body)
-
-	locale, err := utils.LandingPickLocale(pathLocale, body.Locale)
-	if err != nil {
-		landingErr(ctx, 400, err.Error())
-		return
-	}
-
-	prod, ok := landingProduct(v, body.ProductName)
-	if !ok {
-		landingErr(ctx, 400, "productName required")
-		return
-	}
-	phone, msisdnFromHeader, err := landingResolveMSISDN(ctx, body.PhoneNum)
-	if err != nil {
-		landingErr(ctx, 400, err.Error())
-		return
-	}
-
-	if !msisdnFromHeader && !body.SkipConfirm {
-		landingErr(ctx, 400, "without carrier MSISDN header (e.g. X-MSISDN), skipConfirm must be true; complete flow with POST .../confirm-subscription and otp")
-		return
-	}
-
-	c, cancel := landingCtx()
-	defer cancel()
-
-	initRes, err := v.VivaPartner.InitSubscription(c, phone, prod)
-	if err != nil {
-		logger.Error().Err(err).Str("phone", phone).Msg("Viva InitSubscription")
-		landingErr(ctx, 502, err.Error())
-		return
-	}
-	if body.SkipConfirm {
-		_ = ctx.Response(map[string]any{"init": initRes, "locale": locale})
-		return
-	}
-
-	confirmRes, err := v.VivaPartner.ConfirmSubscription(c, phone, prod, nil)
-	if err != nil {
-		logger.Error().Err(err).Str("phone", phone).Msg("Viva ConfirmSubscription")
-		landingErr(ctx, 502, err.Error())
-		return
-	}
-	if confirmRes.ResultCode == 7 {
-		_ = ctx.Response(map[string]any{"init": initRes, "confirm": confirmRes, "locale": locale})
-		return
-	}
-	if confirmRes.ResultCode != 0 {
-		landingErr(ctx, 502, landingVivaResultMsg(confirmRes))
-		return
-	}
-	landingEmitNewOrder(v, phone, body.ProductCode, body.SmsScenario, locale)
-	_ = ctx.Response(map[string]any{"init": initRes, "confirm": confirmRes, "locale": locale})
-}
-
-func landingConfirmSubscriptionHandler(v *viva_api.Viva) func(types.HandlerContext) {
-	return func(ctx types.HandlerContext) {
-		runLandingConfirm(v, ctx, "")
-	}
-}
-
-func landingConfirmSubscriptionLocalizedHandler(v *viva_api.Viva) func(types.HandlerContext) {
-	return func(ctx types.HandlerContext) {
-		runLandingConfirm(v, ctx, ctx.Param("locale"))
-	}
-}
-
-func runLandingConfirm(v *viva_api.Viva, ctx types.HandlerContext, pathLocale string) {
-	if !ensureVivaPartner(v, ctx) {
-		return
-	}
-	var body landingConfirmBody
-	ctx.Data(&body)
-
-	locale, err := utils.LandingPickLocale(pathLocale, body.Locale)
-	if err != nil {
-		landingErr(ctx, 400, err.Error())
-		return
-	}
-
-	prod, ok := landingProduct(v, body.ProductName)
-	if !ok {
-		landingErr(ctx, 400, "productName required")
-		return
-	}
-	otp := strings.TrimSpace(body.OTP)
-	if otp == "" {
-		landingErr(ctx, 400, "otp required")
-		return
-	}
-	phone, _, err := landingResolveMSISDN(ctx, body.PhoneNum)
-	if err != nil {
-		landingErr(ctx, 400, err.Error())
-		return
-	}
-
-	c, cancel := landingCtx()
-	defer cancel()
-
-	res, err := v.VivaPartner.ConfirmSubscription(c, phone, prod, &otp)
-	if err != nil {
-		logger.Error().Err(err).Str("phone", phone).Msg("Viva ConfirmSubscription (OTP)")
-		landingErr(ctx, 502, err.Error())
-		return
-	}
-	if res.ResultCode == 7 {
-		_ = ctx.Response(map[string]any{"confirm": res, "locale": locale})
-		return
-	}
-	if res.ResultCode != 0 {
-		landingErr(ctx, 502, landingVivaResultMsg(res))
-		return
-	}
-	landingEmitNewOrder(v, phone, body.ProductCode, body.SmsScenario, locale)
-	_ = ctx.Response(map[string]any{"confirm": res, "locale": locale})
-}
-
-func landingGetSubscriberInfoGETHandler(v *viva_api.Viva) func(types.HandlerContext) {
-	return func(ctx types.HandlerContext) {
-		runLandingSubscriberGET(v, ctx, "")
-	}
-}
-
-func landingGetSubscriberInfoGETLocalizedHandler(v *viva_api.Viva) func(types.HandlerContext) {
-	return func(ctx types.HandlerContext) {
-		runLandingSubscriberGET(v, ctx, ctx.Param("locale"))
-	}
-}
-
-func runLandingSubscriberGET(v *viva_api.Viva, ctx types.HandlerContext, pathLocale string) {
-	if _, err := utils.LandingPickLocale(pathLocale, ""); err != nil {
-		landingErr(ctx, 400, err.Error())
-		return
-	}
-	if !ensureVivaPartner(v, ctx) {
-		return
-	}
-	phone := normalizeMSISDN(ctx.Param("phoneNum"))
-	if phone == "" {
-		landingErr(ctx, 400, "phoneNum required")
-		return
-	}
-	landingRespondSubscriberInfo(v, ctx, phone)
-}
-
 type landingSubscriberInfoBody struct {
 	PhoneNum string `json:"phoneNum"`
 	Locale   string `json:"locale,omitempty"`
 }
 
+func landingInitSubscriptionHandler(v *viva_api.Viva) func(types.HandlerContext) {
+	return func(ctx types.HandlerContext) {
+		handleInit(v, ctx, "")
+	}
+}
+
+func landingInitSubscriptionLocalizedHandler(v *viva_api.Viva) func(types.HandlerContext) {
+	return func(ctx types.HandlerContext) {
+		handleInit(v, ctx, ctx.Param("locale"))
+	}
+}
+
+func landingConfirmSubscriptionHandler(v *viva_api.Viva) func(types.HandlerContext) {
+	return func(ctx types.HandlerContext) {
+		handleConfirm(v, ctx, "")
+	}
+}
+
+func landingConfirmSubscriptionLocalizedHandler(v *viva_api.Viva) func(types.HandlerContext) {
+	return func(ctx types.HandlerContext) {
+		handleConfirm(v, ctx, ctx.Param("locale"))
+	}
+}
+
+func landingGetSubscriberInfoGETHandler(v *viva_api.Viva) func(types.HandlerContext) {
+	return func(ctx types.HandlerContext) {
+		handleSubscriberGET(v, ctx, "")
+	}
+}
+
+func landingGetSubscriberInfoGETLocalizedHandler(v *viva_api.Viva) func(types.HandlerContext) {
+	return func(ctx types.HandlerContext) {
+		handleSubscriberGET(v, ctx, ctx.Param("locale"))
+	}
+}
+
 func landingGetSubscriberInfoPOSTHandler(v *viva_api.Viva) func(types.HandlerContext) {
 	return func(ctx types.HandlerContext) {
-		runLandingSubscriberPOST(v, ctx, "")
+		handleSubscriberPOST(v, ctx, "")
 	}
 }
 
 func landingGetSubscriberInfoPOSTLocalizedHandler(v *viva_api.Viva) func(types.HandlerContext) {
 	return func(ctx types.HandlerContext) {
-		runLandingSubscriberPOST(v, ctx, ctx.Param("locale"))
+		handleSubscriberPOST(v, ctx, ctx.Param("locale"))
 	}
 }
 
-func runLandingSubscriberPOST(v *viva_api.Viva, ctx types.HandlerContext, pathLocale string) {
-	if !ensureVivaPartner(v, ctx) {
+func handleInit(v *viva_api.Viva, ctx types.HandlerContext, pathLocale string) {
+	if !ensurePartner(v, ctx) {
 		return
 	}
+
+	var body landingInitBody
+	ctx.Data(&body)
+
+	locale, err := utils.LandingPickLocale(pathLocale, body.Locale)
+	if err != nil {
+		respondError(ctx, 400, err.Error())
+		return
+	}
+
+	product := pickProduct(v, body.ProductName)
+	if product == "" {
+		respondError(ctx, 400, "productName required")
+		return
+	}
+
+	phone, fromHeader, err := extractMSISDN(ctx, body.PhoneNum)
+	if err != nil {
+		respondError(ctx, 400, err.Error())
+		return
+	}
+
+	if !fromHeader && !body.SkipConfirm {
+		respondError(ctx, 400, "without carrier MSISDN header, skipConfirm must be true")
+		return
+	}
+
+	c, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+
+	initRes, err := v.VivaPartner.InitSubscription(c, phone, product)
+	if err != nil {
+		logger.Error().Err(err).Str("phone", phone).Msg("Viva InitSubscription")
+		respondError(ctx, 502, err.Error())
+		return
+	}
+
+	if body.SkipConfirm {
+		respondOK(ctx, map[string]interface{}{"init": initRes, "locale": locale})
+		return
+	}
+
+	confirmRes, err := v.VivaPartner.ConfirmSubscription(c, phone, product, nil)
+	if err != nil {
+		logger.Error().Err(err).Str("phone", phone).Msg("Viva ConfirmSubscription")
+		respondError(ctx, 502, err.Error())
+		return
+	}
+
+	if confirmRes.ResultCode == 7 {
+		respondOK(ctx, map[string]interface{}{"init": initRes, "confirm": confirmRes, "locale": locale})
+		return
+	}
+
+	if confirmRes.ResultCode != 0 {
+		respondError(ctx, 502, vivaErrorMessage(confirmRes))
+		return
+	}
+
+	emitNewOrder(v, phone, body.ProductCode, body.SmsScenario, locale)
+	respondOK(ctx, map[string]interface{}{"init": initRes, "confirm": confirmRes, "locale": locale})
+}
+
+func handleConfirm(v *viva_api.Viva, ctx types.HandlerContext, pathLocale string) {
+	if !ensurePartner(v, ctx) {
+		return
+	}
+
+	var body landingConfirmBody
+	ctx.Data(&body)
+
+	locale, err := utils.LandingPickLocale(pathLocale, body.Locale)
+	if err != nil {
+		respondError(ctx, 400, err.Error())
+		return
+	}
+
+	product := pickProduct(v, body.ProductName)
+	if product == "" {
+		respondError(ctx, 400, "productName required")
+		return
+	}
+
+	otp := strings.TrimSpace(body.OTP)
+	if otp == "" {
+		respondError(ctx, 400, "otp required")
+		return
+	}
+
+	phone, _, err := extractMSISDN(ctx, body.PhoneNum)
+	if err != nil {
+		respondError(ctx, 400, err.Error())
+		return
+	}
+
+	c, cancel := context.WithTimeout(context.Background(), requestTimeout)
+	defer cancel()
+
+	res, err := v.VivaPartner.ConfirmSubscription(c, phone, product, &otp)
+	if err != nil {
+		logger.Error().Err(err).Str("phone", phone).Msg("Viva ConfirmSubscription (OTP)")
+		respondError(ctx, 502, err.Error())
+		return
+	}
+
+	if res.ResultCode == 7 {
+		respondOK(ctx, map[string]interface{}{"confirm": res, "locale": locale})
+		return
+	}
+
+	if res.ResultCode != 0 {
+		respondError(ctx, 502, vivaErrorMessage(res))
+		return
+	}
+
+	emitNewOrder(v, phone, body.ProductCode, body.SmsScenario, locale)
+	respondOK(ctx, map[string]interface{}{"confirm": res, "locale": locale})
+}
+
+func handleSubscriberGET(v *viva_api.Viva, ctx types.HandlerContext, pathLocale string) {
+	if _, err := utils.LandingPickLocale(pathLocale, ""); err != nil {
+		respondError(ctx, 400, err.Error())
+		return
+	}
+
+	if !ensurePartner(v, ctx) {
+		return
+	}
+
+	phone := cleanMSISDN(ctx.Param("phoneNum"))
+	if phone == "" {
+		respondError(ctx, 400, "phoneNum required")
+		return
+	}
+
+	fetchSubscriberInfo(ctx, v.VivaPartner, phone)
+}
+
+func handleSubscriberPOST(v *viva_api.Viva, ctx types.HandlerContext, pathLocale string) {
+	if !ensurePartner(v, ctx) {
+		return
+	}
+
 	var body landingSubscriberInfoBody
 	ctx.Data(&body)
+
 	if _, err := utils.LandingPickLocale(pathLocale, body.Locale); err != nil {
-		landingErr(ctx, 400, err.Error())
+		respondError(ctx, 400, err.Error())
 		return
 	}
-	phone, _, err := landingResolveMSISDN(ctx, body.PhoneNum)
+
+	phone, _, err := extractMSISDN(ctx, body.PhoneNum)
 	if err != nil {
-		landingErr(ctx, 400, err.Error())
+		respondError(ctx, 400, err.Error())
 		return
 	}
-	landingRespondSubscriberInfo(v, ctx, phone)
+
+	fetchSubscriberInfo(ctx, v.VivaPartner, phone)
 }
 
-func landingRespondSubscriberInfo(v *viva_api.Viva, ctx types.HandlerContext, phone string) {
-	c, cancel := landingCtx()
+func fetchSubscriberInfo(ctx types.HandlerContext, client viva_api.PartnerSubscriptionAPI, phone string) {
+	c, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
-	info, err := v.VivaPartner.GetSubscriberInfo(c, phone)
+
+	info, err := client.GetSubscriberInfo(c, phone)
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "not found") {
-			landingErr(ctx, 404, err.Error())
+			respondError(ctx, 404, err.Error())
 			return
 		}
 		logger.Error().Err(err).Str("phone", phone).Msg("Viva GetSubscriberInfo")
-		landingErr(ctx, 502, err.Error())
+		respondError(ctx, 502, err.Error())
 		return
 	}
-	_ = ctx.Response(info)
+
+	respondOK(ctx, info)
 }
 
-func ensureVivaPartner(v *viva_api.Viva, ctx types.HandlerContext) bool {
-	if v.VivaPartner != nil {
-		return true
+func ensurePartner(v *viva_api.Viva, ctx types.HandlerContext) bool {
+	if v.VivaPartner == nil {
+		respondError(ctx, 503, "viva api not configured")
+		return false
 	}
-	landingErr(ctx, 503, "viva api not configured")
-	return false
+	return true
 }
 
-func landingProduct(v *viva_api.Viva, name string) (string, bool) {
+func pickProduct(v *viva_api.Viva, name string) string {
 	p := strings.TrimSpace(name)
 	if p == "" {
 		p = v.DefaultProductName
 	}
-	if p == "" {
-		return "", false
+	return p
+}
+
+func extractMSISDN(ctx types.HandlerContext, bodyPhone string) (string, bool, error) {
+	var headers map[string]string
+	ctx.Headers(&headers)
+
+	for key, value := range headers {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		for _, name := range msisdnHeaderNames {
+			if strings.EqualFold(strings.TrimSpace(key), name) {
+				return cleanMSISDN(value), true, nil
+			}
+		}
 	}
-	return p, true
+
+	if p := cleanMSISDN(bodyPhone); p != "" {
+		return p, false, nil
+	}
+
+	return "", false, fmt.Errorf("phoneNum missing: provide in body or via MSISDN header")
 }
 
-func landingCtx() (context.Context, context.CancelFunc) {
-	return context.WithTimeout(context.Background(), 25*time.Second)
+func cleanMSISDN(s string) string {
+	s = strings.TrimSpace(s)
+	return strings.TrimPrefix(s, "+")
 }
 
-func landingErr(ctx types.HandlerContext, status int, msg string) {
+func emitNewOrder(v *viva_api.Viva, phone, productCode, smsScenario, locale string) {
+	pc := strings.TrimSpace(productCode)
+	if pc == "" {
+		pc = strings.TrimSpace(v.OrderProductCode)
+	}
+	service.SendOrderCreate(v, types.OrderTypeNew, phone, pc, smsScenario, locale)
+}
+
+func respondOK(ctx types.HandlerContext, data interface{}) {
+	_ = ctx.Response(data)
+}
+
+func respondError(ctx types.HandlerContext, status int, msg string) {
 	_ = ctx.Response(httpt.MsgResponse{
 		Status:  status,
 		Payload: map[string]string{"error": msg},
 	})
 }
 
-func landingVivaResultMsg(m *vivaclient.ResponseModel) string {
-	if m == nil {
+func vivaErrorMessage(res *vivaclient.ResponseModel) string {
+	if res == nil {
 		return "viva: empty response body"
 	}
-	return fmt.Sprintf("viva subscription resultCode=%d message=%v", m.ResultCode, m.Message)
-}
-
-func normalizeMSISDN(s string) string {
-	s = strings.TrimSpace(s)
-	if strings.HasPrefix(s, "+") {
-		s = s[1:]
-	}
-	return s
-}
-
-func landingResolveMSISDN(ctx types.HandlerContext, bodyPhone string) (string, bool, error) {
-	var hdr map[string]string
-	ctx.Headers(&hdr)
-	for k, v := range hdr {
-		v = strings.TrimSpace(v)
-		if v == "" {
-			continue
-		}
-		for _, name := range landingMSISDNHeaderNames {
-			if strings.EqualFold(strings.TrimSpace(k), name) {
-				return normalizeMSISDN(v), true, nil
-			}
-		}
-	}
-	if p := normalizeMSISDN(bodyPhone); p != "" {
-		return p, false, nil
-	}
-	return "", false, fmt.Errorf("phoneNum missing: set JSON phoneNum (manual entry) or MSISDN header e.g. X-MSISDN (Viva header enrichment)")
-}
-
-func landingEmitNewOrder(v *viva_api.Viva, phone, bodyProductCode, smsScenario, locale string) {
-	pc := strings.TrimSpace(bodyProductCode)
-	if pc == "" {
-		pc = strings.TrimSpace(v.OrderProductCode)
-	}
-	service.SendOrderCreate(v, types.OrderTypeNew, phone, pc, smsScenario, locale)
+	return fmt.Sprintf("viva subscription resultCode=%d message=%v", res.ResultCode, res.Message)
 }
