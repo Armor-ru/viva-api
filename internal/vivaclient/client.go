@@ -22,8 +22,8 @@ type Config struct {
 }
 
 type TokenResponse struct {
-	AccessToken string `json:"accessToken"`
-	ExpiresIn   int    `json:"expiresIn"`
+	AccessToken string `json:"access_token"`
+	ExpiresIn   int    `json:"expires_in"`
 }
 
 type Client struct {
@@ -181,8 +181,6 @@ func (c *Client) do(ctx context.Context, method, path string, body io.Reader, ou
 	return nil
 }
 
-// --- Бизнес-методы (теперь они становятся очень простыми) ---
-
 func (c *Client) GetSubscriberInfo(ctx context.Context, msisdn string) (*GetSubInfoResponse, error) {
 	path := fmt.Sprintf("/api/Subscriber/%s", strings.TrimSpace(msisdn))
 
@@ -216,8 +214,6 @@ func (c *Client) ConfirmSubscription(ctx context.Context, phoneNum, productName 
 	return &out, nil
 }
 
-// --- Вспомогательные функции ---
-
 func subscriptionPath(basePath, phoneNum, productName string, otp *string) string {
 	q := url.Values{}
 	q.Set("phoneNum", strings.TrimSpace(phoneNum))
@@ -228,7 +224,6 @@ func subscriptionPath(basePath, phoneNum, productName string, otp *string) strin
 	return basePath + "?" + q.Encode()
 }
 
-// Error — кастомная ошибка для HTTP-ответов с неправильным статусом
 type Error struct {
 	StatusCode int
 	Message    string

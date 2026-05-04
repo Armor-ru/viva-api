@@ -21,7 +21,7 @@ func LocaleOrDefault(s string) string {
 	case "hy", "arm", "hye", "armenian":
 		return SmsLangHY
 	default:
-		return SmsLangRU
+		return SmsLangHY
 	}
 }
 

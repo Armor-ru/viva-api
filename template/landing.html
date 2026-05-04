@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="hy">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -268,6 +268,14 @@ ul { list-style: none; }
 .viva-result__header {
     display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
 }
+.viva-result__header--standalone { margin-bottom: 0; }
+.viva-result__card--compact { padding: 22px 24px; }
+.viva-result__card--info {
+    background: #EFF6FF; border-color: #BFDBFE;
+}
+.viva-result__icon--info { background: #2563EB; color: white; }
+.viva-result__title--info { color: #1E3A8A; }
+.viva-form--hidden { display: none !important; }
 .viva-result__icon {
     width: 40px; height: 40px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
@@ -374,12 +382,9 @@ ul { list-style: none; }
         </a>
         <div style="display:flex;align-items:center;gap:16px;">
             <div class="viva-lang-switcher" id="langSwitcher">
-                <button class="viva-lang-btn active" data-lang="en">EN</button>
+                <button class="viva-lang-btn active" data-lang="hy">ՀԱՅ</button>
                 <button class="viva-lang-btn" data-lang="ru">RU</button>
-                <button class="viva-lang-btn" data-lang="hy">ՀԱՅ</button>
-            </div>
-            <div class="viva-header__phone">
-                <a href="tel:*111">*111</a> <span data-i18n="header.support">24/7 support</span>
+                <button class="viva-lang-btn" data-lang="en">EN</button>
             </div>
         </div>
     </div>
@@ -393,8 +398,8 @@ ul { list-style: none; }
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                 Kaspersky Security
             </div>
-            <h1 data-i18n="hero.title">Start Your Free<br>Security Trial</h1>
-            <p data-i18n="hero.subtitle">Get 14 days of full protection — no payment required. Just enter your phone number to get started.</p>
+            <h1 data-i18n="hero.title">Սկսեք անվճար<br>փորձնական ամկետ</h1>
+            <p data-i18n="hero.subtitle">14 օր ամբողջական պաշտպանություն՝ առանց վճարման։ Պարզապես մուտքագրեք հեռախոսահամարը։</p>
         </div>
     </div>
 </section>
@@ -403,12 +408,14 @@ ul { list-style: none; }
 <main class="viva-main">
     <div class="viva-main__inner">
         <div class="viva-card">
-            <h2 class="viva-card__title" data-i18n="card.title">Get Your Free Trial</h2>
-            <p class="viva-card__subtitle" data-i18n="card.subtitle">Enter your phone number and receive the activation code via SMS</p>
+            <h2 class="viva-card__title" data-i18n="card.title">Ստանալ փորձնական ամկետ</h2>
+            <p class="viva-card__subtitle" data-i18n="card.subtitle">Մուտքագրեք հեռախոսահամարը և ստացեք ակտիվացման կոդը SMS-ով</p>
+
+            <div class="viva-result" id="resultBlock"></div>
 
             <form id="checkForm" novalidate>
                 <div class="viva-form-group">
-                    <label class="viva-form-label" data-i18n="form.phoneLabel">Phone Number <span>*</span></label>
+                    <label class="viva-form-label" data-i18n="form.phoneLabel">Հեռախոսահամար <span>*</span></label>
                     <div class="viva-input-wrap">
                         <div class="viva-input-icon">
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
@@ -427,7 +434,7 @@ ul { list-style: none; }
 
                 <div class="viva-otp-step" id="otpStep" aria-hidden="true">
                     <div class="viva-form-group">
-                        <label class="viva-form-label" for="otpInput" data-i18n="form.otpLabel">SMS code</label>
+                        <label class="viva-form-label" for="otpInput" data-i18n="form.otpLabel">Կոդը SMS-ից <span>*</span></label>
                         <input
                             type="text"
                             id="otpInput"
@@ -436,7 +443,7 @@ ul { list-style: none; }
                             autocomplete="one-time-code"
                             maxlength="12"
                             data-i18n-placeholder="form.otpPlaceholder"
-                            placeholder="000000"
+                            placeholder="Մուտքագրեք կոդը"
                         >
                         <div class="viva-field-error" id="otpError"></div>
                     </div>
@@ -444,12 +451,9 @@ ul { list-style: none; }
 
                 <button type="submit" class="viva-btn viva-btn--primary" id="submitBtn">
                     <div class="viva-btn__spinner"></div>
-                    <span class="viva-btn__text" data-i18n="form.submitBtn">Start Free Trial</span>
+                    <span class="viva-btn__text" data-i18n="form.submitBtn">Սկսել փորձնականը</span>
                 </button>
             </form>
-
-            <!-- Result Block -->
-            <div class="viva-result" id="resultBlock"></div>
         </div>
 
         <!-- Features -->
@@ -458,22 +462,22 @@ ul { list-style: none; }
                 <div class="viva-feature__icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                 </div>
-                <div class="viva-feature__title" data-i18n="features.security.title">Security</div>
-                <div class="viva-feature__desc" data-i18n="features.security.desc">Real-time protection from viruses and threats</div>
+                <div class="viva-feature__title" data-i18n="features.security.title">Անվտանգություն</div>
+                <div class="viva-feature__desc" data-i18n="features.security.desc">Պաշտպանություն վիրուսներից և սպառնալիքներից իրական ժամանակում</div>
             </div>
             <div class="viva-feature">
                 <div class="viva-feature__icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
                 </div>
-                <div class="viva-feature__title" data-i18n="features.instant.title">Instant</div>
-                <div class="viva-feature__desc" data-i18n="features.instant.desc">Activation code sent via SMS in seconds</div>
+                <div class="viva-feature__title" data-i18n="features.instant.title">Ակնթարթային</div>
+                <div class="viva-feature__desc" data-i18n="features.instant.desc">Ակտիվացման կոդը ուղարկվում է SMS-ով վայրկյանների ընթացքում</div>
             </div>
             <div class="viva-feature">
                 <div class="viva-feature__icon">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
                 </div>
                 <div class="viva-feature__title" data-i18n="features.always.title">24/7</div>
-                <div class="viva-feature__desc" data-i18n="features.always.desc">Your trial is active around the clock</div>
+                <div class="viva-feature__desc" data-i18n="features.always.desc">Փորձնականը ակտիվ է շուրջօրյա</div>
             </div>
         </div>
     </div>
@@ -483,11 +487,11 @@ ul { list-style: none; }
 <footer class="viva-footer">
     <div class="container">
         <div class="viva-footer__links">
-            <a href="#" data-i18n="footer.privacy">Privacy Policy</a>
-            <a href="#" data-i18n="footer.terms">Terms of Use</a>
-            <a href="tel:*111" data-i18n="footer.contact">Contact Us</a>
+            <a href="#" data-i18n="footer.privacy">Գաղտնիության քաղաքականություն</a>
+            <a href="#" data-i18n="footer.terms">Օգտագործման պայմաններ</a>
+            <a href="tel:*111" data-i18n="footer.contact">Կապվել մեզ հետ</a>
         </div>
-        <p data-i18n="footer.copyright">© 2025 Viva Armenia. All rights reserved.</p>
+        <p data-i18n="footer.copyright">© {year} Viva Armenia. Բոլոր իրավունքները պաշտպանված են։</p>
     </div>
 </footer>
 
@@ -498,14 +502,14 @@ ul { list-style: none; }
    ============================================= */
 var i18n = (function() {
     'use strict';
-    var currentLang = 'en';
+    var currentLang = 'hy';
     var fallbackLang = 'en';
 
     var dict = {
         en: {
             'header.support': '24/7 support',
             'hero.title': 'Start Your Free<br>Security Trial',
-            'hero.subtitle': 'Get 14 days of full protection — no payment required. Just enter your phone number to get started.',
+            'hero.subtitle': 'Get 7 days of full protection — no payment required. Just enter your phone number to get started.',
             'card.title': 'Get Your Free Trial',
             'card.subtitle': 'Enter your phone number and receive the activation code via SMS',
             'form.phoneLabel': 'Phone Number <span>*</span>',
@@ -532,6 +536,8 @@ var i18n = (function() {
             'result.successMsg': 'Your free trial is active! Download the app and use the activation code to start protecting your device.',
             'result.errorMsg': 'Could not activate the trial. Please check your number and try again.',
             'result.alreadySubscribed': 'This number already has an active subscription.',
+            'result.applicationSubmitted': 'Thank you! Your request has been submitted.',
+            'result.requestFailed': 'Something went wrong. Please try again.',
             'result.apiError': 'Error: ',
             'features.security.title': 'Security',
             'features.security.desc': 'Real-time protection from viruses and threats',
@@ -542,12 +548,12 @@ var i18n = (function() {
             'footer.privacy': 'Privacy Policy',
             'footer.terms': 'Terms of Use',
             'footer.contact': 'Contact Us',
-            'footer.copyright': '© 2025 Viva Armenia. All rights reserved.'
+            'footer.copyright': '© {year} Viva Armenia. All rights reserved.'
         },
         ru: {
             'header.support': 'Поддержка 24/7',
             'hero.title': 'Начните бесплатный<br>пробный период',
-            'hero.subtitle': '14 дней полной защиты — без оплаты. Просто введите номер телефона, чтобы начать.',
+            'hero.subtitle': '7 дней полной защиты — без оплаты. Просто введите номер телефона, чтобы начать.',
             'card.title': 'Получить пробный период',
             'card.subtitle': 'Введите номер телефона и получите код активации по SMS',
             'form.phoneLabel': 'Номер телефона <span>*</span>',
@@ -574,6 +580,8 @@ var i18n = (function() {
             'result.successMsg': 'Ваш пробный период активен! Скачайте приложение и используйте код активации для защиты устройства.',
             'result.errorMsg': 'Не удалось активировать пробный период. Проверьте номер и попробуйте снова.',
             'result.alreadySubscribed': 'На этот номер уже оформлена подписка.',
+            'result.applicationSubmitted': 'Спасибо! Ваша заявка направлена.',
+            'result.requestFailed': 'Что-то пошло не так. Попробуйте ещё раз.',
             'result.apiError': 'Ошибка: ',
             'features.security.title': 'Безопасность',
             'features.security.desc': 'Защита от вирусов и угроз в реальном времени',
@@ -584,12 +592,12 @@ var i18n = (function() {
             'footer.privacy': 'Политика конфиденциальности',
             'footer.terms': 'Условия использования',
             'footer.contact': 'Связаться с нами',
-            'footer.copyright': '© 2025 Viva Armenia. Все права защищены.'
+            'footer.copyright': '© {year} Viva Armenia. Все права защищены.'
         },
         hy: {
             'header.support': '24/7 աջակցություն',
             'hero.title': 'Սկսեք անվճար<br>փորձնական ամկետ',
-            'hero.subtitle': '14 օր ամբողջական պաշտպանություն՝ առանց վճարման։ Պարզապես մուտքագրեք հեռախոսահամարը։',
+            'hero.subtitle': '7 օր ամբողջական պաշտպանություն՝ առանց վճարման։ Պարզապես մուտքագրեք հեռախոսահամարը։',
             'card.title': 'Ստանալ փորձնական ամկետ',
             'card.subtitle': 'Մուտքագրեք հեռախոսահամարը և ստացեք ակտիվացման կոդը SMS-ով',
             'form.phoneLabel': 'Հեռախոսահամար <span>*</span>',
@@ -616,6 +624,8 @@ var i18n = (function() {
             'result.successMsg': 'Ձեր փորձնականը ակտիվ է։ Ներբեռնեք հավելվածը և օգտագործեք ակտիվացման կոդը։',
             'result.errorMsg': 'Չհաջողվեց ակտիվացնել փորնականը։ Ստուգեք համարը և փորեք կրկին։',
             'result.alreadySubscribed': 'Այս համարը արդեն ունի ակտիվ բաժանորդագրություն։',
+            'result.applicationSubmitted': 'Շնորհակալություն։ Ձեր դիմումն ուղարկված է։',
+            'result.requestFailed': 'Ինչ-որ բան սխալ է գնացել։ Փորձեք կրկին։',
             'result.apiError': 'Սխալ։ ',
             'features.security.title': 'Անվտանգություն',
             'features.security.desc': 'Պաշտպանություն վիրուսներից և սպառնալիքներից իրական ժամանակում',
@@ -626,16 +636,21 @@ var i18n = (function() {
             'footer.privacy': 'Գաղտնիության քաղաքականություն',
             'footer.terms': 'Օգտագործման պայմաններ',
             'footer.contact': 'Կապվել մեզ հետ',
-            'footer.copyright': '© 2025 Viva Armenia. Բոլոր իրավունքները պաշտպանված են։'
+            'footer.copyright': '© {year} Viva Armenia. Բոլոր իրավունքները պաշտպանված են։'
         }
     };
 
     function t(key, fallback) {
         var langDict = dict[currentLang] || dict[fallbackLang];
         var val = langDict[key];
-        if (val !== undefined) return val;
-        if (fallback) return fallback;
-        return dict[fallbackLang][key] || key;
+        if (val === undefined) {
+            if (fallback) val = fallback;
+            else val = dict[fallbackLang][key] || key;
+        }
+        if (typeof val === 'string' && val.indexOf('{year}') !== -1) {
+            val = val.replace(/\{year\}/g, String(new Date().getFullYear()));
+        }
+        return val;
     }
 
     function setLang(lang) {
@@ -673,7 +688,11 @@ var i18n = (function() {
     function init() {
         var saved = null;
         try { saved = localStorage.getItem('viva_lang'); } catch(e) {}
-        if (saved && dict[saved]) setLang(saved);
+        if (saved && dict[saved]) {
+            setLang(saved);
+        } else {
+            setLang('hy');
+        }
     }
 
     return { t: t, setLang: setLang, getLang: getLang, addTranslations: addTranslations, init: init, dict: dict };
@@ -716,7 +735,7 @@ var APIClient = (function() {
     var baseUrl = '';
 
     function landingPath(rest) {
-        var lang = (typeof i18n !== 'undefined' && i18n.getLang) ? i18n.getLang() : 'en';
+        var lang = (typeof i18n !== 'undefined' && i18n.getLang) ? i18n.getLang() : 'hy';
         return '/landing/' + lang + rest;
     }
 
@@ -785,86 +804,36 @@ var UI = (function() {
     }
 
     function renderResult(container, data) {
-        var statusVal = data.status || 'trial';
-        var isActive = (statusVal === 'active' || statusVal === 'trial');
-        var statusClass = statusVal === 'trial' ? 'trial' : statusVal === 'active' ? 'active' : statusVal === 'expired' ? 'expired' : 'cancelled';
+        var statusVal = data.status || 'error';
+        var iconWrapClass = 'viva-result__icon--error';
+        var titleClass = 'viva-result__title--error';
+        var cardClass = 'viva-result__card--error';
+        var iconSvg =
+            '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+        var titleText = esc(data.title || i18n.t('result.notFound'));
 
-        var detailsHTML = '';
-        if (data.product) {
-            detailsHTML += '<li class="viva-result__detail">' +
-                '<span class="viva-result__label">' + i18n.t('result.product') + '</span>' +
-                '<span class="viva-result__value">' + esc(data.product) + '</span></li>';
-        }
-        if (data.startDate) {
-            detailsHTML += '<li class="viva-result__detail">' +
-                '<span class="viva-result__label">' + i18n.t('result.start') + '</span>' +
-                '<span class="viva-result__value">' + esc(data.startDate) + '</span></li>';
-        }
-        if (data.endDate) {
-            detailsHTML += '<li class="viva-result__detail">' +
-                '<span class="viva-result__label">' + i18n.t('result.end') + '</span>' +
-                '<span class="viva-result__value">' + esc(data.endDate) + '</span></li>';
-        }
-        if (data.daysLeft !== undefined) {
-            detailsHTML += '<li class="viva-result__detail">' +
-                '<span class="viva-result__label">' + i18n.t('result.daysLeft') + '</span>' +
-                '<span class="viva-result__value">' + data.daysLeft + '</span></li>';
-        }
-        if (data.devices) {
-            detailsHTML += '<li class="viva-result__detail">' +
-                '<span class="viva-result__label">' + i18n.t('result.devices') + '</span>' +
-                '<span class="viva-result__value">' + esc(data.devices) + '</span></li>';
-        }
-        if (data.activationCode) {
-            detailsHTML += '<li class="viva-result__detail">' +
-                '<span class="viva-result__label">Activation Code</span>' +
-                '<span class="viva-result__value" style="font-family:monospace;letter-spacing:1px;font-size:16px;">' + esc(data.activationCode) + '</span></li>';
-        }
-        if (data.downloadUrl) {
-            detailsHTML += '<li class="viva-result__detail">' +
-                '<span class="viva-result__label">Download</span>' +
-                '<span class="viva-result__value"><a href="' + esc(data.downloadUrl) + '" target="_blank" style="color:var(--viva-red);font-weight:600;">Download App →</a></span></li>';
-        }
-
-        var statusLabel = i18n.t('result.' + statusVal) || statusVal;
-
-        var messageHTML = '';
-        if (isActive) {
-            messageHTML = '<div class="viva-result__message viva-result__message--success">' +
-                (data.message || i18n.t('result.successMsg')) +
-                '</div>';
-        } else {
-            messageHTML = '<div class="viva-result__message viva-result__message--error">' +
-                (data.message || i18n.t('result.errorMsg')) +
-                '</div>';
+        if (statusVal === 'submitted') {
+            iconWrapClass = 'viva-result__icon--success';
+            titleClass = 'viva-result__title--success';
+            cardClass = 'viva-result__card--success';
+            iconSvg =
+                '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+            titleText = esc(data.title || i18n.t('result.applicationSubmitted'));
+        } else if (statusVal === 'trial' || statusVal === 'info') {
+            iconWrapClass = 'viva-result__icon--info';
+            titleClass = 'viva-result__title--info';
+            cardClass = 'viva-result__card--info';
+            iconSvg =
+                '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
+            titleText = esc(data.title || i18n.t('result.alreadySubscribed'));
         }
 
         container.innerHTML =
-            '<div class="viva-result__card viva-result__card--' + (isActive ? 'success' : 'error') + '">' +
-                '<div class="viva-result__header">' +
-                    '<div class="viva-result__icon viva-result__icon--' + (isActive ? 'success' : 'error') + '">' +
-                        (isActive ?
-                            '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' :
-                            '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
-                        ) +
-                    '</div>' +
-                    '<div class="viva-result__title viva-result__title--' + (isActive ? 'success' : 'error') + '">' +
-                        (isActive ? i18n.t('result.found') : i18n.t('result.notFound')) +
-                    '</div>' +
+            '<div class="viva-result__card viva-result__card--compact ' + cardClass + '">' +
+                '<div class="viva-result__header viva-result__header--standalone">' +
+                    '<div class="viva-result__icon ' + iconWrapClass + '">' + iconSvg + '</div>' +
+                    '<div class="viva-result__title ' + titleClass + '">' + titleText + '</div>' +
                 '</div>' +
-                '<ul class="viva-result__details">' +
-                    '<li class="viva-result__detail">' +
-                        '<span class="viva-result__label">' + i18n.t('result.status') + '</span>' +
-                        '<span class="viva-result__value">' +
-                            '<span class="viva-result__status viva-result__status--' + statusClass + '">' +
-                                '<span class="viva-result__status__dot"></span>' +
-                                esc(statusLabel) +
-                            '</span>' +
-                        '</span>' +
-                    '</li>' +
-                    detailsHTML +
-                '</ul>' +
-                messageHTML +
             '</div>';
         container.classList.add('show');
     }
@@ -887,29 +856,21 @@ var App = (function() {
     var subscriptionStage = 'phone';
     var pendingPhone = '';
 
-    function formatVivaMessage(m) {
-        if (m == null || m === '') return '';
-        if (typeof m === 'string') return m;
-        if (typeof m === 'object' && m.message != null) return String(m.message);
-        try { return JSON.stringify(m); } catch (e) { return String(m); }
-    }
-
     function mapLandingSubscriptionResult(data) {
         var confirm = data.confirm;
         var init = data.init;
         var m = confirm || init;
         if (!m) {
-            return { status: 'error', message: i18n.t('result.errorMsg') };
+            return { status: 'error', title: i18n.t('result.notFound') };
         }
         var code = m.resultCode;
-        var msg = formatVivaMessage(m.message);
-        if (code === 0 || m.result === true) {
-            return { status: 'trial', message: i18n.t('result.successMsg') };
+        if (confirm && (code === 0 || m.result === true)) {
+            return { status: 'submitted', title: i18n.t('result.applicationSubmitted') };
         }
         if (code === 7) {
-            return { status: 'trial', message: msg || i18n.t('result.alreadySubscribed') };
+            return { status: 'info', title: i18n.t('result.alreadySubscribed') };
         }
-        return { status: 'error', message: msg || i18n.t('result.errorMsg') };
+        return { status: 'error', title: i18n.t('result.notFound') };
     }
 
     function subscriptionPayload(phone, extra) {
@@ -1039,7 +1000,7 @@ var App = (function() {
             .then(function(data) {
                 var ir = data.init;
                 if (!ir) {
-                    UI.renderResult(resultBlock, { status: 'error', message: i18n.t('result.errorMsg') });
+                    UI.renderResult(resultBlock, { status: 'error', title: i18n.t('result.notFound') });
                     return;
                 }
                 if (ir.resultCode === 7) {
@@ -1048,10 +1009,7 @@ var App = (function() {
                 }
                 var okInit = (ir.resultCode === 0 || ir.result === true);
                 if (!okInit) {
-                    UI.renderResult(resultBlock, {
-                        status: 'error',
-                        message: formatVivaMessage(ir.message) || i18n.t('result.errorMsg')
-                    });
+                    UI.renderResult(resultBlock, { status: 'error', title: i18n.t('result.notFound') });
                     return;
                 }
                 pendingPhone = cleanPhone;
@@ -1061,11 +1019,8 @@ var App = (function() {
                 updateSubmitLabel();
                 otpInput.focus();
             })
-            .catch(function(err) {
-                UI.renderResult(resultBlock, {
-                    status: 'error',
-                    message: i18n.t('result.apiError') + (err.message || i18n.t('result.errorMsg'))
-                });
+            .catch(function() {
+                UI.renderResult(resultBlock, { status: 'error', title: i18n.t('result.requestFailed') });
             })
             .finally(function() {
                 UI.hideLoading(submitBtn);
@@ -1089,14 +1044,20 @@ var App = (function() {
 
         APIClient.confirmSubscription(subscriptionPayload(pendingPhone, { otp: otp }))
             .then(function(data) {
-                UI.renderResult(resultBlock, mapLandingSubscriptionResult(data));
+                var mapped = mapLandingSubscriptionResult(data);
+                UI.renderResult(resultBlock, mapped);
+                if (mapped.status === 'submitted' && form) {
+                    form.classList.add('viva-form--hidden');
+                    var card = form.closest('.viva-card');
+                    if (card) {
+                        var sub = card.querySelector('.viva-card__subtitle');
+                        if (sub) sub.classList.add('viva-form--hidden');
+                    }
+                }
                 resetOtpStep();
             })
-            .catch(function(err) {
-                UI.renderResult(resultBlock, {
-                    status: 'error',
-                    message: i18n.t('result.apiError') + (err.message || i18n.t('result.errorMsg'))
-                });
+            .catch(function() {
+                UI.renderResult(resultBlock, { status: 'error', title: i18n.t('result.requestFailed') });
             })
             .finally(function() {
                 UI.hideLoading(submitBtn);
