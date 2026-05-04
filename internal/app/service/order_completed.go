@@ -1,14 +1,17 @@
-package viva_api
+package service
 
 import (
 	"strings"
+
+	viva_api "github.com/Armor-ru/viva-api/internal/app"
+	"github.com/Armor-ru/viva-api/internal/app/utils"
 
 	"github.com/Armor-ru/sds-go/pkg/logger"
 	"github.com/Armor-ru/sds-go/pkg/types"
 	"github.com/spf13/cast"
 )
 
-func (s *Viva) onCompletedHandler(ctx types.HandlerContext) {
+func HandleOrderCompleted(v *viva_api.Viva, ctx types.HandlerContext) {
 	order := types.OrderResponse{}
 	ctx.Data(&order)
 
@@ -25,22 +28,22 @@ func (s *Viva) onCompletedHandler(ctx types.HandlerContext) {
 		return
 	}
 
-	wh := strings.TrimSpace(cast.ToString(order.CustomData[CDVivaWebhook]))
-	scenarioHint := strings.TrimSpace(cast.ToString(order.CustomData[CDSmsScenario]))
+	wh := strings.TrimSpace(cast.ToString(order.CustomData[viva_api.CDVivaWebhook]))
+	scenarioHint := strings.TrimSpace(cast.ToString(order.CustomData[viva_api.CDSmsScenario]))
 	locale := orderSmsLocale(order)
 
 	switch wh {
-	case WHActivation:
-		s.sendRenewSms(order, phone, scenarioHint, locale)
-	case WHRemove:
-		s.sendRemoveSms(order, phone, scenarioHint, locale)
+	case viva_api.WHActivation:
+		sendRenewSms(v, order, phone, scenarioHint, locale)
+	case viva_api.WHRemove:
+		sendRemoveSms(v, order, phone, scenarioHint, locale)
 	default:
-		s.sendNewActivationSms(order, phone, locale)
+		sendNewActivationSms(v, order, phone, locale)
 	}
 }
 
 func orderSmsLocale(order types.OrderResponse) string {
-	return LocaleOrDefault(cast.ToString(order.CustomData[CDSmsLocale]))
+	return utils.LocaleOrDefault(cast.ToString(order.CustomData[viva_api.CDSmsLocale]))
 }
 
 func orderPhone(order types.OrderResponse) string {

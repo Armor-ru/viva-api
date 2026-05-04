@@ -1,4 +1,4 @@
-package viva_api
+package utils
 
 import (
 	"fmt"
@@ -24,8 +24,7 @@ type SmsScenarioPayload struct {
 	LicenseKey   string
 	DownloadURL  string
 	ProductLabel string
-	// Locale: en | ru | hy — из customData заказа (лендинг / вебхук).
-	Locale string
+	Locale       string
 }
 
 func BuildSmsText(sc SmsScenario, p SmsScenarioPayload) string {
@@ -153,8 +152,8 @@ func smsDeactivated(lang, product string) string {
 	}
 }
 
-func (s *Viva) smppSendScenario(msisdn string, sc SmsScenario, p SmsScenarioPayload) error {
-	if s.smppSender == nil {
+func SmppSendScenario(sender *SmppSender, msisdn string, sc SmsScenario, p SmsScenarioPayload) error {
+	if sender == nil {
 		return fmt.Errorf("smppSender is nil")
 	}
 	body := BuildSmsText(sc, p)
@@ -162,5 +161,5 @@ func (s *Viva) smppSendScenario(msisdn string, sc SmsScenario, p SmsScenarioPayl
 		return fmt.Errorf("empty sms body for scenario %s", sc)
 	}
 	logger.Info().Str("sender", "SMPP").Str("scenario", string(sc)).Str("msisdn", msisdn).Msg("SPEC-8 SMS")
-	return s.smppSender.Send(msisdn, body)
+	return sender.Send(msisdn, body)
 }

@@ -1,18 +1,16 @@
-package viva_api
+package utils
 
 import (
 	"fmt"
 	"strings"
 )
 
-// Поддерживаемые коды для SMS (SMPP) и префиксов /landing/{код}/...
 const (
 	SmsLangEN = "en"
 	SmsLangRU = "ru"
 	SmsLangHY = "hy"
 )
 
-// LocaleOrDefault нормализует язык для SMS; пустое значение → ru (как было до i18n).
 func LocaleOrDefault(s string) string {
 	s = strings.ToLower(strings.TrimSpace(s))
 	switch s {
@@ -27,7 +25,6 @@ func LocaleOrDefault(s string) string {
 	}
 }
 
-// ParseLocalePath проверяет сегмент пути :locale (строго en|ru|hy).
 func ParseLocalePath(s string) (string, error) {
 	s = strings.ToLower(strings.TrimSpace(s))
 	if s == "" {
@@ -45,7 +42,7 @@ func ParseLocalePath(s string) (string, error) {
 	}
 }
 
-func landingPickLocale(pathLocale, bodyLocale string) (string, error) {
+func LandingPickLocale(pathLocale, bodyLocale string) (string, error) {
 	if strings.TrimSpace(pathLocale) != "" {
 		return ParseLocalePath(pathLocale)
 	}

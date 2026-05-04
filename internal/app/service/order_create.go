@@ -1,17 +1,19 @@
-package viva_api
+package service
 
 import (
 	"strings"
 	"time"
+
+	viva_api "github.com/Armor-ru/viva-api/internal/app"
+	"github.com/Armor-ru/viva-api/internal/app/utils"
 
 	"github.com/Armor-ru/sds-go/pkg/logger"
 	"github.com/Armor-ru/sds-go/pkg/types"
 	"github.com/google/uuid"
 )
 
-// sendOrderCreate шлёт order/create в NATS (как обработчик вебхука ExtAppPartneerProductActivationRequest и др.).
-func (s *Viva) sendOrderCreate(orderType types.OrderType, phone, externalID, smsScenario, smsLocale string) {
-	if s.intTransport == nil {
+func SendOrderCreate(v *viva_api.Viva, orderType types.OrderType, phone, externalID, smsScenario, smsLocale string) {
+	if v.IntTransport == nil {
 		logger.Warn().Msg("intTransport nil, skip order/create")
 		return
 	}
@@ -26,7 +28,7 @@ func (s *Viva) sendOrderCreate(orderType types.OrderType, phone, externalID, sms
 		return
 	}
 
-	orderId := uuid.NewSHA1(uuid.MustParse(s.accountId), []byte(externalID+":"+phone)).String()
+	orderId := uuid.NewSHA1(uuid.MustParse(v.AccountId), []byte(externalID+":"+phone)).String()
 
 	var items []types.OrderItemRequest
 	if orderType == types.OrderTypeNew {
@@ -39,11 +41,11 @@ func (s *Viva) sendOrderCreate(orderType types.OrderType, phone, externalID, sms
 	wh := ""
 	switch orderType {
 	case types.OrderTypeNew:
-		wh = WHActivationReq
+		wh = viva_api.WHActivationReq
 	case types.OrderTypeRenew:
-		wh = WHActivation
+		wh = viva_api.WHActivation
 	case types.OrderTypeCancel:
-		wh = WHRemove
+		wh = viva_api.WHRemove
 	}
 
 	newOrder := types.OrderCreateRequest{
@@ -53,14 +55,14 @@ func (s *Viva) sendOrderCreate(orderType types.OrderType, phone, externalID, sms
 			"phone": phone,
 		},
 		CustomData: types.JSON{
-			CDVivaWebhook: wh,
-			CDSmsScenario: strings.TrimSpace(smsScenario),
-			CDSmsLocale:   LocaleOrDefault(smsLocale),
+			viva_api.CDVivaWebhook: wh,
+			viva_api.CDSmsScenario: strings.TrimSpace(smsScenario),
+			viva_api.CDSmsLocale:   utils.LocaleOrDefault(smsLocale),
 		},
 		Items: items,
 	}
 
-	_, err := s.intTransport.Send("order/create", newOrder, types.SendOptions{
+	_, err := v.IntTransport.Send("order/create", newOrder, types.SendOptions{
 		Timeout: 3 * time.Second,
 	})
 	if err != nil {
