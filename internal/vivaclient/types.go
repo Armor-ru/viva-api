@@ -13,7 +13,7 @@ type GetSubInfoResponse struct {
 	AvailableProducts []int32 `json:"availableProducts"`
 }
 
-// ResponseModel — Init / Confirm / Remove subscription
+// ResponseModel — ответ Viva Init / Confirm subscription
 type ResponseModel struct {
 	ResultCode int         `json:"resultCode"`
 	Message    interface{} `json:"message"`

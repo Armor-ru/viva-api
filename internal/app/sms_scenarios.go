@@ -161,6 +161,6 @@ func (s *Viva) smppSendScenario(msisdn string, sc SmsScenario, p SmsScenarioPayl
 	if strings.TrimSpace(body) == "" {
 		return fmt.Errorf("empty sms body for scenario %s", sc)
 	}
-	logger.Info().Str("sender", "SMPP").Str("scenario", string(sc)).Str("msisdn", msisdn).Msg("SPEC §8 SMS")
+	logger.Info().Str("sender", "SMPP").Str("scenario", string(sc)).Str("msisdn", msisdn).Msg("SPEC-8 SMS")
 	return s.smppSender.Send(msisdn, body)
 }
