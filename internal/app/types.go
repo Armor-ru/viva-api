@@ -23,6 +23,7 @@ type ExtReq struct {
 	PhoneNum    string `json:"phoneNum" validate:"required"`
 	ProductCode string `json:"productCode" validate:"required"`
 	SmsScenario string `json:"smsScenario,omitempty"`
+	Locale      string `json:"locale,omitempty"`
 }
 
 type SmsData struct {

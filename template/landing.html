@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- content пустой: на localhost / 127.0.0.1 запросы идут на тот же host, порт 4000 (см. resolveApiBase). Иначе задай origin BFF, например https://api.example.com -->
+<meta name="viva-api-base" content="">
+<title>Viva Armenia — Get Your Security Subscription</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Armenian:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+/* =============================================
+   viva-kit.css — CSS Kit for Viva-style Landing Pages
+   Based on viva.am design language
+   ============================================= */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+    font-family: 'Noto Sans Armenian', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #1a1a2e;
+    background: #fff;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+}
+a { text-decoration: none; color: inherit; }
+img { max-width: 100%; display: block; }
+button { cursor: pointer; font-family: inherit; }
+ul { list-style: none; }
+
+:root {
+    --viva-red: #E30613;
+    --viva-red-dark: #B8050F;
+    --viva-red-light: #FF2030;
+    --viva-bg: #FFFFFF;
+    --viva-bg-alt: #F4F4F8;
+    --viva-bg-dark: #0F0F1A;
+    --viva-text: #1A1A2E;
+    --viva-text-muted: #6B7280;
+    --viva-text-light: #FFFFFF;
+    --viva-border: #E5E7EB;
+    --viva-success: #10B981;
+    --viva-warning: #F59E0B;
+    --viva-error: #EF4444;
+    --viva-shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+    --viva-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    --viva-shadow-lg: 0 12px 40px rgba(0,0,0,0.15);
+    --viva-radius: 12px;
+    --viva-radius-sm: 8px;
+    --viva-radius-lg: 20px;
+    --viva-max-width: 1200px;
+    --viva-transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.container { max-width: var(--viva-max-width); margin: 0 auto; padding: 0 24px; }
+
+/* ===== HEADER ===== */
+.viva-header {
+    background: rgba(255,255,255,0.95);
+    border-bottom: 1px solid var(--viva-border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(12px);
+}
+.viva-header__inner {
+    max-width: var(--viva-max-width);
+    margin: 0 auto;
+    padding: 0 24px;
+    height: 72px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.viva-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+.viva-logo img {
+    height: 38px;
+    width: auto;
+    max-width: 200px;
+    object-fit: contain;
+    display: block;
+}
+.viva-header__phone { font-size: 15px; font-weight: 600; color: var(--viva-text); }
+.viva-header__phone a { color: var(--viva-red); }
+
+/* ===== LANG SWITCHER ===== */
+.viva-lang-switcher {
+    display: flex; gap: 2px;
+    background: var(--viva-bg-alt);
+    border-radius: 8px; padding: 3px;
+    border: 1px solid var(--viva-border);
+}
+.viva-lang-btn {
+    padding: 6px 14px; border: none; background: transparent;
+    font-family: inherit; font-size: 13px; font-weight: 700;
+    color: var(--viva-text-muted); cursor: pointer;
+    border-radius: 6px; transition: var(--viva-transition);
+    letter-spacing: 0.3px; text-transform: uppercase;
+}
+.viva-lang-btn.active {
+    background: var(--viva-red); color: var(--viva-text-light);
+    box-shadow: var(--viva-shadow-sm);
+}
+.viva-lang-btn:hover:not(.active) { color: var(--viva-text); background: rgba(0,0,0,0.04); }
+
+/* ===== HERO ===== */
+.viva-hero {
+    background: linear-gradient(135deg, var(--viva-red) 0%, var(--viva-red-dark) 100%);
+    position: relative; overflow: hidden;
+    padding: 80px 0 100px;
+}
+.viva-hero::before {
+    content: ''; position: absolute;
+    top: -100px; right: -100px;
+    width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(255,255,255,0.08) 0%, transparent 70%);
+    border-radius: 50%;
+}
+.viva-hero::after {
+    content: ''; position: absolute;
+    bottom: -150px; left: -50px;
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, transparent 70%);
+    border-radius: 50%;
+}
+.viva-hero__content {
+    position: relative; z-index: 1;
+    text-align: center; color: var(--viva-text-light);
+}
+.viva-hero__badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(255,255,255,0.15);
+    backdrop-filter: blur(8px);
+    padding: 8px 20px; border-radius: 100px;
+    font-size: 13px; font-weight: 600;
+    letter-spacing: 0.5px; text-transform: uppercase;
+    margin-bottom: 24px;
+    border: 1px solid rgba(255,255,255,0.2);
+}
+.viva-hero h1 {
+    font-size: clamp(32px, 5vw, 52px);
+    font-weight: 800; line-height: 1.15;
+    margin-bottom: 20px; letter-spacing: -0.5px;
+}
+.viva-hero p {
+    font-size: clamp(16px, 2vw, 20px);
+    opacity: 0.9; max-width: 600px;
+    margin: 0 auto; line-height: 1.6;
+}
+
+/* ===== MAIN ===== */
+.viva-main {
+    margin-top: -50px;
+    position: relative; z-index: 2;
+    padding-bottom: 80px;
+}
+.viva-main__inner {
+    max-width: 560px; margin: 0 auto;
+}
+
+/* ===== CARD ===== */
+.viva-card {
+    background: var(--viva-bg);
+    border-radius: var(--viva-radius);
+    box-shadow: var(--viva-shadow-lg);
+    padding: 40px;
+    border: 1px solid var(--viva-border);
+}
+.viva-card__title {
+    font-size: 24px; font-weight: 700;
+    margin-bottom: 8px; color: var(--viva-text);
+}
+.viva-card__subtitle {
+    font-size: 15px; color: var(--viva-text-muted);
+    margin-bottom: 32px;
+}
+
+/* ===== FORM ===== */
+.viva-form-group { margin-bottom: 24px; }
+.viva-form-label {
+    display: block; font-size: 14px;
+    font-weight: 600; margin-bottom: 8px;
+    color: var(--viva-text);
+}
+.viva-form-label span { color: var(--viva-red); margin-left: 2px; }
+.viva-input-wrap { position: relative; }
+.viva-input-wrap .viva-input-icon {
+    position: absolute; left: 16px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--viva-text-muted);
+    pointer-events: none; display: flex;
+}
+.viva-input {
+    width: 100%; padding: 14px 16px 14px 48px;
+    border: 2px solid var(--viva-border);
+    border-radius: var(--viva-radius-sm);
+    font-size: 16px; font-family: inherit;
+    color: var(--viva-text); background: var(--viva-bg-alt);
+    transition: var(--viva-transition);
+}
+.viva-input:focus {
+    outline: none; border-color: var(--viva-red);
+    background: var(--viva-bg);
+    box-shadow: 0 0 0 4px rgba(227, 6, 19, 0.1);
+}
+.viva-input::placeholder { color: #A0A4B0; }
+.viva-input.input-error { border-color: var(--viva-error); background: #FEF2F2; }
+.viva-field-error {
+    font-size: 13px; color: var(--viva-error);
+    margin-top: 6px; display: none;
+}
+.viva-field-error.show { display: block; }
+
+.viva-otp-step {
+    display: none;
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--viva-border);
+}
+.viva-otp-step.is-visible { display: block; }
+
+/* ===== BUTTONS ===== */
+.viva-btn {
+    display: inline-flex; align-items: center;
+    justify-content: center; gap: 10px;
+    padding: 16px 32px; border: none;
+    border-radius: var(--viva-radius-sm);
+    font-size: 16px; font-weight: 700;
+    font-family: inherit; transition: var(--viva-transition);
+    cursor: pointer; width: 100%;
+    position: relative; overflow: hidden;
+}
+.viva-btn--primary {
+    background: var(--viva-red); color: var(--viva-text-light);
+}
+.viva-btn--primary:hover {
+    background: var(--viva-red-dark);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(227, 6, 19, 0.35);
+}
+.viva-btn--primary:active { transform: translateY(0); }
+.viva-btn:disabled {
+    opacity: 0.6; cursor: not-allowed;
+    transform: none !important; box-shadow: none !important;
+}
+.viva-btn__spinner {
+    width: 20px; height: 20px;
+    border: 2.5px solid rgba(255,255,255,0.3);
+    border-top-color: #fff; border-radius: 50%;
+    animation: spin 0.7s linear infinite; display: none;
+}
+.viva-btn--loading .viva-btn__spinner { display: block; }
+.viva-btn--loading .viva-btn__text { opacity: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== RESULT ===== */
+.viva-result { margin-top: 28px; display: none; }
+.viva-result.show { display: block; animation: fadeSlideUp 0.4s ease; }
+@keyframes fadeSlideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.viva-result__card {
+    border-radius: var(--viva-radius-sm);
+    padding: 24px; border: 1px solid;
+}
+.viva-result__card--success { background: #F0FDF4; border-color: #BBF7D0; }
+.viva-result__card--error { background: #FEF2F2; border-color: #FECACA; }
+.viva-result__header {
+    display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+}
+.viva-result__icon {
+    width: 40px; height: 40px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.viva-result__icon--success { background: var(--viva-success); color: white; }
+.viva-result__icon--error { background: var(--viva-error); color: white; }
+.viva-result__title { font-size: 18px; font-weight: 700; }
+.viva-result__title--success { color: #166534; }
+.viva-result__title--error { color: #991B1B; }
+.viva-result__details {
+    list-style: none; display: flex; flex-direction: column; gap: 10px;
+}
+.viva-result__detail {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 14px; padding-bottom: 10px;
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+.viva-result__detail:last-child { border-bottom: none; padding-bottom: 0; }
+.viva-result__label { color: var(--viva-text-muted); font-weight: 500; }
+.viva-result__value { font-weight: 600; color: var(--viva-text); text-align: right; }
+.viva-result__status {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 3px 10px; border-radius: 100px;
+    font-size: 12px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.3px;
+}
+.viva-result__status--active { background: #DCFCE7; color: #166534; }
+.viva-result__status--expired { background: #FEF3C7; color: #92400E; }
+.viva-result__status--cancelled { background: #FEE2E2; color: #991B1B; }
+.viva-result__status--trial { background: #DBEAFE; color: #1E40AF; }
+.viva-result__status__dot { width: 7px; height: 7px; border-radius: 50%; }
+.viva-result__status--active .viva-result__status__dot { background: #16A34A; }
+.viva-result__status--expired .viva-result__status__dot { background: #D97706; }
+.viva-result__status--cancelled .viva-result__status__dot { background: #DC2626; }
+.viva-result__status--trial .viva-result__status__dot { background: #2563EB; }
+
+.viva-result__message {
+    margin-top: 16px; padding: 12px 16px;
+    border-radius: var(--viva-radius-sm);
+    font-size: 14px; line-height: 1.5;
+}
+.viva-result__message--success { background: rgba(16, 185, 129, 0.1); color: #166534; }
+.viva-result__message--error { background: rgba(239, 68, 68, 0.1); color: #991B1B; }
+
+/* ===== FEATURES ===== */
+.viva-features {
+    margin-top: 48px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+@media (max-width: 768px) { .viva-features { grid-template-columns: 1fr; } }
+.viva-feature { text-align: center; padding: 24px 16px; }
+.viva-feature__icon {
+    width: 48px; height: 48px; border-radius: 14px;
+    background: var(--viva-bg-alt);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 14px; color: var(--viva-red);
+}
+.viva-feature__title { font-size: 15px; font-weight: 700; margin-bottom: 6px; color: var(--viva-text); }
+.viva-feature__desc { font-size: 13px; color: var(--viva-text-muted); line-height: 1.5; }
+
+/* ===== FOOTER ===== */
+.viva-footer {
+    background: var(--viva-bg-dark);
+    color: rgba(255,255,255,0.6);
+    padding: 40px 0; text-align: center; font-size: 14px;
+}
+.viva-footer a { color: rgba(255,255,255,0.8); transition: var(--viva-transition); }
+.viva-footer a:hover { color: #fff; }
+.viva-footer__links {
+    display: flex; justify-content: center;
+    gap: 24px; margin-bottom: 16px; flex-wrap: wrap;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 600px) {
+    .viva-hero { padding: 50px 0 70px; }
+    .viva-card { padding: 28px 20px; }
+    .viva-header__phone { display: none; }
+    .viva-lang-switcher { gap: 1px; padding: 2px; }
+    .viva-lang-btn { padding: 5px 10px; font-size: 12px; }
+}
+
+.fade-in { animation: fadeIn 0.5s ease; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+</style>
+</head>
+<body>
+
+<!-- ===== HEADER ===== -->
+<header class="viva-header">
+    <div class="viva-header__inner">
+        <a href="#" class="viva-logo" aria-label="Viva" title="Viva">
+            <img
+                src="./viva-logo-for-web.webp"
+                alt="Viva"
+                width="160"
+                height="40"
+                decoding="async"
+                fetchpriority="high"
+            >
+        </a>
+        <div style="display:flex;align-items:center;gap:16px;">
+            <div class="viva-lang-switcher" id="langSwitcher">
+                <button class="viva-lang-btn active" data-lang="en">EN</button>
+                <button class="viva-lang-btn" data-lang="ru">RU</button>
+                <button class="viva-lang-btn" data-lang="hy">ՀԱՅ</button>
+            </div>
+            <div class="viva-header__phone">
+                <a href="tel:*111">*111</a> <span data-i18n="header.support">24/7 support</span>
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- ===== HERO ===== -->
+<section class="viva-hero">
+    <div class="container">
+        <div class="viva-hero__content">
+            <div class="viva-hero__badge">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                Kaspersky Security
+            </div>
+            <h1 data-i18n="hero.title">Start Your Free<br>Security Trial</h1>
+            <p data-i18n="hero.subtitle">Get 14 days of full protection — no payment required. Just enter your phone number to get started.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ===== MAIN ===== -->
+<main class="viva-main">
+    <div class="viva-main__inner">
+        <div class="viva-card">
+            <h2 class="viva-card__title" data-i18n="card.title">Get Your Free Trial</h2>
+            <p class="viva-card__subtitle" data-i18n="card.subtitle">Enter your phone number and receive the activation code via SMS</p>
+
+            <form id="checkForm" novalidate>
+                <div class="viva-form-group">
+                    <label class="viva-form-label" data-i18n="form.phoneLabel">Phone Number <span>*</span></label>
+                    <div class="viva-input-wrap">
+                        <div class="viva-input-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                        </div>
+                        <input
+                            type="tel"
+                            id="phoneInput"
+                            class="viva-input"
+                            placeholder="+374 XX XXX XXX"
+                            autocomplete="tel"
+                            maxlength="17"
+                        >
+                    </div>
+                    <div class="viva-field-error" id="phoneError"></div>
+                </div>
+
+                <div class="viva-otp-step" id="otpStep" aria-hidden="true">
+                    <div class="viva-form-group">
+                        <label class="viva-form-label" for="otpInput" data-i18n="form.otpLabel">SMS code</label>
+                        <input
+                            type="text"
+                            id="otpInput"
+                            class="viva-input"
+                            inputmode="numeric"
+                            autocomplete="one-time-code"
+                            maxlength="12"
+                            data-i18n-placeholder="form.otpPlaceholder"
+                            placeholder="000000"
+                        >
+                        <div class="viva-field-error" id="otpError"></div>
+                    </div>
+                </div>
+
+                <button type="submit" class="viva-btn viva-btn--primary" id="submitBtn">
+                    <div class="viva-btn__spinner"></div>
+                    <span class="viva-btn__text" data-i18n="form.submitBtn">Start Free Trial</span>
+                </button>
+            </form>
+
+            <!-- Result Block -->
+            <div class="viva-result" id="resultBlock"></div>
+        </div>
+
+        <!-- Features -->
+        <div class="viva-features">
+            <div class="viva-feature">
+                <div class="viva-feature__icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                </div>
+                <div class="viva-feature__title" data-i18n="features.security.title">Security</div>
+                <div class="viva-feature__desc" data-i18n="features.security.desc">Real-time protection from viruses and threats</div>
+            </div>
+            <div class="viva-feature">
+                <div class="viva-feature__icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                </div>
+                <div class="viva-feature__title" data-i18n="features.instant.title">Instant</div>
+                <div class="viva-feature__desc" data-i18n="features.instant.desc">Activation code sent via SMS in seconds</div>
+            </div>
+            <div class="viva-feature">
+                <div class="viva-feature__icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                </div>
+                <div class="viva-feature__title" data-i18n="features.always.title">24/7</div>
+                <div class="viva-feature__desc" data-i18n="features.always.desc">Your trial is active around the clock</div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<!-- ===== FOOTER ===== -->
+<footer class="viva-footer">
+    <div class="container">
+        <div class="viva-footer__links">
+            <a href="#" data-i18n="footer.privacy">Privacy Policy</a>
+            <a href="#" data-i18n="footer.terms">Terms of Use</a>
+            <a href="tel:*111" data-i18n="footer.contact">Contact Us</a>
+        </div>
+        <p data-i18n="footer.copyright">© 2025 Viva Armenia. All rights reserved.</p>
+    </div>
+</footer>
+
+<!-- ===== SHARED SCRIPTS ===== -->
+<script>
+/* =============================================
+   i18n.js — Multi-language support
+   ============================================= */
+var i18n = (function() {
+    'use strict';
+    var currentLang = 'en';
+    var fallbackLang = 'en';
+
+    var dict = {
+        en: {
+            'header.support': '24/7 support',
+            'hero.title': 'Start Your Free<br>Security Trial',
+            'hero.subtitle': 'Get 14 days of full protection — no payment required. Just enter your phone number to get started.',
+            'card.title': 'Get Your Free Trial',
+            'card.subtitle': 'Enter your phone number and receive the activation code via SMS',
+            'form.phoneLabel': 'Phone Number <span>*</span>',
+            'form.phonePlaceholder': '+374 XX XXX XXX',
+            'form.submitBtn': 'Start Free Trial',
+            'form.sendCode': 'Send SMS code',
+            'form.confirmOtp': 'Confirm subscription',
+            'form.otpLabel': 'Code from SMS <span>*</span>',
+            'form.otpPlaceholder': 'Enter code',
+            'form.otpError': 'Enter the code from the SMS',
+            'form.phoneError': 'Please enter a valid phone number in +374 XX XXX XXX format',
+            'result.found': 'Trial Activated',
+            'result.notFound': 'Activation Failed',
+            'result.status': 'Status',
+            'result.product': 'Product',
+            'result.start': 'Start Date',
+            'result.end': 'End Date',
+            'result.daysLeft': 'Days Left',
+            'result.devices': 'Devices',
+            'result.active': 'Active',
+            'result.trial': 'Trial',
+            'result.expired': 'Expired',
+            'result.cancelled': 'Cancelled',
+            'result.successMsg': 'Your free trial is active! Download the app and use the activation code to start protecting your device.',
+            'result.errorMsg': 'Could not activate the trial. Please check your number and try again.',
+            'result.alreadySubscribed': 'This number already has an active subscription.',
+            'result.apiError': 'Error: ',
+            'features.security.title': 'Security',
+            'features.security.desc': 'Real-time protection from viruses and threats',
+            'features.instant.title': 'Instant',
+            'features.instant.desc': 'Activation code sent via SMS in seconds',
+            'features.always.title': '24/7',
+            'features.always.desc': 'Your trial is active around the clock',
+            'footer.privacy': 'Privacy Policy',
+            'footer.terms': 'Terms of Use',
+            'footer.contact': 'Contact Us',
+            'footer.copyright': '© 2025 Viva Armenia. All rights reserved.'
+        },
+        ru: {
+            'header.support': 'Поддержка 24/7',
+            'hero.title': 'Начните бесплатный<br>пробный период',
+            'hero.subtitle': '14 дней полной защиты — без оплаты. Просто введите номер телефона, чтобы начать.',
+            'card.title': 'Получить пробный период',
+            'card.subtitle': 'Введите номер телефона и получите код активации по SMS',
+            'form.phoneLabel': 'Номер телефона <span>*</span>',
+            'form.phonePlaceholder': '+374 XX XXX XXX',
+            'form.submitBtn': 'Начать пробный период',
+            'form.sendCode': 'Получить код по SMS',
+            'form.confirmOtp': 'Подтвердить подписку',
+            'form.otpLabel': 'Код из SMS <span>*</span>',
+            'form.otpPlaceholder': 'Введите код',
+            'form.otpError': 'Введите код из SMS',
+            'form.phoneError': 'Введите корректный номер телефона в формате +374 XX XXX XXX',
+            'result.found': 'Пробный период активирован',
+            'result.notFound': 'Не удалось активировать',
+            'result.status': 'Статус',
+            'result.product': 'Продукт',
+            'result.start': 'Начало',
+            'result.end': 'Окончание',
+            'result.daysLeft': 'Осталось дней',
+            'result.devices': 'Устройства',
+            'result.active': 'Активна',
+            'result.trial': 'Пробная',
+            'result.expired': 'Истекла',
+            'result.cancelled': 'Отменена',
+            'result.successMsg': 'Ваш пробный период активен! Скачайте приложение и используйте код активации для защиты устройства.',
+            'result.errorMsg': 'Не удалось активировать пробный период. Проверьте номер и попробуйте снова.',
+            'result.alreadySubscribed': 'На этот номер уже оформлена подписка.',
+            'result.apiError': 'Ошибка: ',
+            'features.security.title': 'Безопасность',
+            'features.security.desc': 'Защита от вирусов и угроз в реальном времени',
+            'features.instant.title': 'Мгновенно',
+            'features.instant.desc': 'Код активации приходит по SMS за секунды',
+            'features.always.title': '24/7',
+            'features.always.desc': 'Пробный период активен круглосуточно',
+            'footer.privacy': 'Политика конфиденциальности',
+            'footer.terms': 'Условия использования',
+            'footer.contact': 'Связаться с нами',
+            'footer.copyright': '© 2025 Viva Armenia. Все права защищены.'
+        },
+        hy: {
+            'header.support': '24/7 աջակցություն',
+            'hero.title': 'Սկսեք անվճար<br>փորձնական ամկետ',
+            'hero.subtitle': '14 օր ամբողջական պաշտպանություն՝ առանց վճարման։ Պարզապես մուտքագրեք հեռախոսահամարը։',
+            'card.title': 'Ստանալ փորձնական ամկետ',
+            'card.subtitle': 'Մուտքագրեք հեռախոսահամարը և ստացեք ակտիվացման կոդը SMS-ով',
+            'form.phoneLabel': 'Հեռախոսահամար <span>*</span>',
+            'form.phonePlaceholder': '+374 XX XXX XXX',
+            'form.submitBtn': 'Սկսել փորձնականը',
+            'form.sendCode': 'Ուղարկել կոդը SMS-ով',
+            'form.confirmOtp': 'Հաստատել բաժանորդագրությունը',
+            'form.otpLabel': 'Կոդը SMS-ից <span>*</span>',
+            'form.otpPlaceholder': 'Մուտքագրեք կոդը',
+            'form.otpError': 'Մուտքագրեք SMS-ում ստացած կոդը',
+            'form.phoneError': 'Խնդրում ենք մուտքագրել ճիշտ հեռախոսահամար +374 XX XXX XXX ձևաչափով',
+            'result.found': 'Փորձնականը ակտիվացված է',
+            'result.notFound': 'Ակտիվացումը ձախողվեց',
+            'result.status': 'Կարգավիճակ',
+            'result.product': 'Արտադրանք',
+            'result.start': 'Սկիզբ',
+            'result.end': 'Ավարտ',
+            'result.daysLeft': 'նացած օրեր',
+            'result.devices': 'Սարքեր',
+            'result.active': 'Ակտիվ',
+            'result.trial': 'Փորձնական',
+            'result.expired': 'Ժամկետանց',
+            'result.cancelled': 'Չեղարկված',
+            'result.successMsg': 'Ձեր փորձնականը ակտիվ է։ Ներբեռնեք հավելվածը և օգտագործեք ակտիվացման կոդը։',
+            'result.errorMsg': 'Չհաջողվեց ակտիվացնել փորնականը։ Ստուգեք համարը և փորեք կրկին։',
+            'result.alreadySubscribed': 'Այս համարը արդեն ունի ակտիվ բաժանորդագրություն։',
+            'result.apiError': 'Սխալ։ ',
+            'features.security.title': 'Անվտանգություն',
+            'features.security.desc': 'Պաշտպանություն վիրուսներից և սպառնալիքներից իրական ժամանակում',
+            'features.instant.title': 'Ակնթարթային',
+            'features.instant.desc': 'Ակտիվացման կոդը ուղարկվում է SMS-ով վայրկյանների ընթացքում',
+            'features.always.title': '24/7',
+            'features.always.desc': 'Փորձնականը ակտիվ է շուրջօրյա',
+            'footer.privacy': 'Գաղտնիության քաղաքականություն',
+            'footer.terms': 'Օգտագործման պայմաններ',
+            'footer.contact': 'Կապվել մեզ հետ',
+            'footer.copyright': '© 2025 Viva Armenia. Բոլոր իրավունքները պաշտպանված են։'
+        }
+    };
+
+    function t(key, fallback) {
+        var langDict = dict[currentLang] || dict[fallbackLang];
+        var val = langDict[key];
+        if (val !== undefined) return val;
+        if (fallback) return fallback;
+        return dict[fallbackLang][key] || key;
+    }
+
+    function setLang(lang) {
+        if (!dict[lang]) lang = fallbackLang;
+        currentLang = lang;
+        document.documentElement.lang = lang === 'hy' ? 'hy' : lang;
+
+        document.querySelectorAll('[data-i18n]').forEach(function(el) {
+            var key = el.getAttribute('data-i18n');
+            el.innerHTML = t(key);
+        });
+
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(function(el) {
+            var key = el.getAttribute('data-i18n-placeholder');
+            el.setAttribute('placeholder', t(key));
+        });
+
+        document.querySelectorAll('.viva-lang-btn').forEach(function(btn) {
+            btn.classList.toggle('active', btn.getAttribute('data-lang') === lang);
+        });
+
+        try { localStorage.setItem('viva_lang', lang); } catch(e) {}
+        document.dispatchEvent(new CustomEvent('viva-lang-change', { detail: { lang: lang } }));
+    }
+
+    function getLang() { return currentLang; }
+
+    function addTranslations(lang, obj) {
+        if (!dict[lang]) dict[lang] = {};
+        for (var key in obj) {
+            if (obj.hasOwnProperty(key)) dict[lang][key] = obj[key];
+        }
+    }
+
+    function init() {
+        var saved = null;
+        try { saved = localStorage.getItem('viva_lang'); } catch(e) {}
+        if (saved && dict[saved]) setLang(saved);
+    }
+
+    return { t: t, setLang: setLang, getLang: getLang, addTranslations: addTranslations, init: init, dict: dict };
+})();
+
+/* =============================================
+   phone-formatter.js
+   ============================================= */
+var PhoneFormatter = (function() {
+    'use strict';
+    return {
+        format: function(raw) {
+            var digits = raw.replace(/\D/g, '');
+            if (!digits.startsWith('374')) {
+                if (digits.startsWith('0')) digits = '374' + digits.slice(1);
+                else if (!digits.startsWith('3')) digits = '374' + digits;
+            }
+            var formatted = '+374';
+            var rest = digits.slice(3);
+            if (rest.length > 0) formatted += ' ' + rest.slice(0, 2);
+            if (rest.length > 2) formatted += ' ' + rest.slice(2, 5);
+            if (rest.length > 5) formatted += ' ' + rest.slice(5, 8);
+            return formatted;
+        },
+        clean: function(formatted) {
+            return '+' + formatted.replace(/\D/g, '');
+        },
+        validate: function(phone) {
+            var digits = phone.replace(/\D/g, '');
+            return digits.length >= 11 && digits.length <= 14 && digits.startsWith('374');
+        }
+    };
+})();
+
+/* =============================================
+   api-client.js — Landing endpoints
+   ============================================= */
+var APIClient = (function() {
+    'use strict';
+    var baseUrl = '';
+
+    function landingPath(rest) {
+        var lang = (typeof i18n !== 'undefined' && i18n.getLang) ? i18n.getLang() : 'en';
+        return '/landing/' + lang + rest;
+    }
+
+    return {
+        setBaseUrl: function(url) { baseUrl = String(url || '').replace(/\/+$/, ''); },
+        _request: function(method, path, body) {
+            var url = baseUrl + path;
+            var opts = { method: method, headers: {} };
+            if (body != null && method !== 'GET' && method !== 'HEAD') {
+                opts.headers['Content-Type'] = 'application/json';
+                opts.body = JSON.stringify(body);
+            }
+            return fetch(url, opts).then(function(resp) {
+                return resp.text().then(function(text) {
+                    var json = null;
+                    if (text) {
+                        try { json = JSON.parse(text); } catch (e) { /* non-JSON body */ }
+                    }
+                    if (!resp.ok) {
+                        var msg = (json && json.error) ? json.error : ('HTTP ' + resp.status + (text ? ': ' + text.slice(0, 400) : ''));
+                        throw new Error(msg);
+                    }
+                    return json || {};
+                });
+            });
+        },
+        initSubscription: function(data) {
+            return this._request('POST', landingPath('/init-subscription'), data);
+        },
+        confirmSubscription: function(data) {
+            return this._request('POST', landingPath('/confirm-subscription'), data);
+        },
+        getSubscriberInfo: function(phone) {
+            var digits = String(phone).replace(/\D/g, '');
+            return this._request('GET', landingPath('/subscriber-info/' + encodeURIComponent(digits)), null);
+        },
+        postSubscriberInfo: function(data) {
+            return this._request('POST', landingPath('/subscriber-info'), data);
+        }
+    };
+})();
+
+/* =============================================
+   ui-helpers.js
+   ============================================= */
+var UI = (function() {
+    'use strict';
+    function $(sel) { return document.querySelector(sel); }
+
+    function showLoading(btn) { btn.classList.add('viva-btn--loading'); btn.disabled = true; }
+    function hideLoading(btn) { btn.classList.remove('viva-btn--loading'); btn.disabled = false; }
+
+    function showError(input, errorEl, msg) {
+        input.classList.add('input-error');
+        if (errorEl) { errorEl.innerHTML = msg || ''; errorEl.classList.add('show'); }
+    }
+    function clearError(input, errorEl) {
+        input.classList.remove('input-error');
+        if (errorEl) errorEl.classList.remove('show');
+    }
+
+    function esc(str) {
+        var div = document.createElement('div');
+        div.textContent = str || '';
+        return div.innerHTML;
+    }
+
+    function renderResult(container, data) {
+        var statusVal = data.status || 'trial';
+        var isActive = (statusVal === 'active' || statusVal === 'trial');
+        var statusClass = statusVal === 'trial' ? 'trial' : statusVal === 'active' ? 'active' : statusVal === 'expired' ? 'expired' : 'cancelled';
+
+        var detailsHTML = '';
+        if (data.product) {
+            detailsHTML += '<li class="viva-result__detail">' +
+                '<span class="viva-result__label">' + i18n.t('result.product') + '</span>' +
+                '<span class="viva-result__value">' + esc(data.product) + '</span></li>';
+        }
+        if (data.startDate) {
+            detailsHTML += '<li class="viva-result__detail">' +
+                '<span class="viva-result__label">' + i18n.t('result.start') + '</span>' +
+                '<span class="viva-result__value">' + esc(data.startDate) + '</span></li>';
+        }
+        if (data.endDate) {
+            detailsHTML += '<li class="viva-result__detail">' +
+                '<span class="viva-result__label">' + i18n.t('result.end') + '</span>' +
+                '<span class="viva-result__value">' + esc(data.endDate) + '</span></li>';
+        }
+        if (data.daysLeft !== undefined) {
+            detailsHTML += '<li class="viva-result__detail">' +
+                '<span class="viva-result__label">' + i18n.t('result.daysLeft') + '</span>' +
+                '<span class="viva-result__value">' + data.daysLeft + '</span></li>';
+        }
+        if (data.devices) {
+            detailsHTML += '<li class="viva-result__detail">' +
+                '<span class="viva-result__label">' + i18n.t('result.devices') + '</span>' +
+                '<span class="viva-result__value">' + esc(data.devices) + '</span></li>';
+        }
+        if (data.activationCode) {
+            detailsHTML += '<li class="viva-result__detail">' +
+                '<span class="viva-result__label">Activation Code</span>' +
+                '<span class="viva-result__value" style="font-family:monospace;letter-spacing:1px;font-size:16px;">' + esc(data.activationCode) + '</span></li>';
+        }
+        if (data.downloadUrl) {
+            detailsHTML += '<li class="viva-result__detail">' +
+                '<span class="viva-result__label">Download</span>' +
+                '<span class="viva-result__value"><a href="' + esc(data.downloadUrl) + '" target="_blank" style="color:var(--viva-red);font-weight:600;">Download App →</a></span></li>';
+        }
+
+        var statusLabel = i18n.t('result.' + statusVal) || statusVal;
+
+        var messageHTML = '';
+        if (isActive) {
+            messageHTML = '<div class="viva-result__message viva-result__message--success">' +
+                (data.message || i18n.t('result.successMsg')) +
+                '</div>';
+        } else {
+            messageHTML = '<div class="viva-result__message viva-result__message--error">' +
+                (data.message || i18n.t('result.errorMsg')) +
+                '</div>';
+        }
+
+        container.innerHTML =
+            '<div class="viva-result__card viva-result__card--' + (isActive ? 'success' : 'error') + '">' +
+                '<div class="viva-result__header">' +
+                    '<div class="viva-result__icon viva-result__icon--' + (isActive ? 'success' : 'error') + '">' +
+                        (isActive ?
+                            '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' :
+                            '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>'
+                        ) +
+                    '</div>' +
+                    '<div class="viva-result__title viva-result__title--' + (isActive ? 'success' : 'error') + '">' +
+                        (isActive ? i18n.t('result.found') : i18n.t('result.notFound')) +
+                    '</div>' +
+                '</div>' +
+                '<ul class="viva-result__details">' +
+                    '<li class="viva-result__detail">' +
+                        '<span class="viva-result__label">' + i18n.t('result.status') + '</span>' +
+                        '<span class="viva-result__value">' +
+                            '<span class="viva-result__status viva-result__status--' + statusClass + '">' +
+                                '<span class="viva-result__status__dot"></span>' +
+                                esc(statusLabel) +
+                            '</span>' +
+                        '</span>' +
+                    '</li>' +
+                    detailsHTML +
+                '</ul>' +
+                messageHTML +
+            '</div>';
+        container.classList.add('show');
+    }
+
+    return {
+        $: $,
+        showLoading: showLoading, hideLoading: hideLoading,
+        showError: showError, clearError: clearError,
+        renderResult: renderResult, esc: esc
+    };
+})();
+
+/* =============================================
+   app.js — Main application
+   ============================================= */
+var App = (function() {
+    'use strict';
+
+    var form, phoneInput, phoneError, otpStep, otpInput, otpError, submitBtn, submitBtnText, resultBlock;
+    var subscriptionStage = 'phone';
+    var pendingPhone = '';
+
+    function formatVivaMessage(m) {
+        if (m == null || m === '') return '';
+        if (typeof m === 'string') return m;
+        if (typeof m === 'object' && m.message != null) return String(m.message);
+        try { return JSON.stringify(m); } catch (e) { return String(m); }
+    }
+
+    function mapLandingSubscriptionResult(data) {
+        var confirm = data.confirm;
+        var init = data.init;
+        var m = confirm || init;
+        if (!m) {
+            return { status: 'error', message: i18n.t('result.errorMsg') };
+        }
+        var code = m.resultCode;
+        var msg = formatVivaMessage(m.message);
+        if (code === 0 || m.result === true) {
+            return { status: 'trial', message: i18n.t('result.successMsg') };
+        }
+        if (code === 7) {
+            return { status: 'trial', message: msg || i18n.t('result.alreadySubscribed') };
+        }
+        return { status: 'error', message: msg || i18n.t('result.errorMsg') };
+    }
+
+    function subscriptionPayload(phone, extra) {
+        var o = {
+            phoneNum: phone,
+            locale: i18n.getLang()
+        };
+        if (extra) {
+            for (var k in extra) {
+                if (Object.prototype.hasOwnProperty.call(extra, k)) o[k] = extra[k];
+            }
+        }
+        return o;
+    }
+
+    function resetOtpStep() {
+        subscriptionStage = 'phone';
+        pendingPhone = '';
+        if (otpStep) {
+            otpStep.classList.remove('is-visible');
+            otpStep.setAttribute('aria-hidden', 'true');
+        }
+        if (otpInput) otpInput.value = '';
+        if (otpInput && otpError) UI.clearError(otpInput, otpError);
+        updateSubmitLabel();
+    }
+
+    function updateSubmitLabel() {
+        if (!submitBtnText) return;
+        if (subscriptionStage === 'otp') {
+            submitBtnText.innerHTML = i18n.t('form.confirmOtp');
+        } else {
+            submitBtnText.innerHTML = i18n.t('form.sendCode');
+        }
+    }
+
+    function resolveApiBase() {
+        var meta = document.querySelector('meta[name="viva-api-base"]');
+        if (meta && meta.content && meta.content.trim()) {
+            return meta.content.trim();
+        }
+        var h = window.location.hostname;
+        if (h === 'localhost' || h === '127.0.0.1') {
+            return window.location.protocol + '//' + h + ':4000';
+        }
+        return '';
+    }
+
+    function init() {
+        var base = resolveApiBase();
+        if (base) {
+            APIClient.setBaseUrl(base);
+        }
+
+        form = UI.$('#checkForm');
+        phoneInput = UI.$('#phoneInput');
+        phoneError = UI.$('#phoneError');
+        otpStep = UI.$('#otpStep');
+        otpInput = UI.$('#otpInput');
+        otpError = UI.$('#otpError');
+        submitBtn = UI.$('#submitBtn');
+        submitBtnText = submitBtn ? submitBtn.querySelector('.viva-btn__text') : null;
+        resultBlock = UI.$('#resultBlock');
+
+        initLangSwitcher();
+        bindEvents();
+        updateSubmitLabel();
+
+        document.addEventListener('viva-lang-change', function() { updateSubmitLabel(); });
+    }
+
+    function initLangSwitcher() {
+        document.querySelectorAll('.viva-lang-btn').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                i18n.setLang(this.getAttribute('data-lang'));
+            });
+        });
+    }
+
+    function bindEvents() {
+        phoneInput.addEventListener('input', function() {
+            var val = this.value;
+            var formatted = PhoneFormatter.format(val);
+            if (formatted !== val) phoneInput.value = formatted;
+            UI.clearError(phoneInput, phoneError);
+            resetOtpStep();
+        });
+
+        phoneInput.addEventListener('paste', function(e) {
+            var pasted = (e.clipboardData || window.clipboardData).getData('text');
+            e.preventDefault();
+            phoneInput.value = PhoneFormatter.format(pasted);
+            UI.clearError(phoneInput, phoneError);
+            resetOtpStep();
+        });
+
+        if (otpInput) {
+            otpInput.addEventListener('input', function() {
+                UI.clearError(otpInput, otpError);
+            });
+        }
+
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            if (subscriptionStage === 'otp') {
+                handleConfirmOtp();
+            } else {
+                handleSubmit();
+            }
+        });
+    }
+
+    function handleSubmit() {
+        var phone = phoneInput.value;
+        var cleanPhone = PhoneFormatter.clean(phone);
+
+        if (!PhoneFormatter.validate(phone)) {
+            UI.showError(phoneInput, phoneError, i18n.t('form.phoneError'));
+            phoneInput.focus();
+            return;
+        }
+
+        UI.showLoading(submitBtn);
+        resultBlock.classList.remove('show');
+
+        APIClient.initSubscription(subscriptionPayload(cleanPhone, { skipConfirm: true }))
+            .then(function(data) {
+                var ir = data.init;
+                if (!ir) {
+                    UI.renderResult(resultBlock, { status: 'error', message: i18n.t('result.errorMsg') });
+                    return;
+                }
+                if (ir.resultCode === 7) {
+                    UI.renderResult(resultBlock, mapLandingSubscriptionResult({ init: ir }));
+                    return;
+                }
+                var okInit = (ir.resultCode === 0 || ir.result === true);
+                if (!okInit) {
+                    UI.renderResult(resultBlock, {
+                        status: 'error',
+                        message: formatVivaMessage(ir.message) || i18n.t('result.errorMsg')
+                    });
+                    return;
+                }
+                pendingPhone = cleanPhone;
+                subscriptionStage = 'otp';
+                otpStep.classList.add('is-visible');
+                otpStep.setAttribute('aria-hidden', 'false');
+                updateSubmitLabel();
+                otpInput.focus();
+            })
+            .catch(function(err) {
+                UI.renderResult(resultBlock, {
+                    status: 'error',
+                    message: i18n.t('result.apiError') + (err.message || i18n.t('result.errorMsg'))
+                });
+            })
+            .finally(function() {
+                UI.hideLoading(submitBtn);
+            });
+    }
+
+    function handleConfirmOtp() {
+        var otp = (otpInput.value || '').trim();
+        if (!otp) {
+            UI.showError(otpInput, otpError, i18n.t('form.otpError'));
+            otpInput.focus();
+            return;
+        }
+        if (!pendingPhone) {
+            resetOtpStep();
+            return;
+        }
+
+        UI.showLoading(submitBtn);
+        resultBlock.classList.remove('show');
+
+        APIClient.confirmSubscription(subscriptionPayload(pendingPhone, { otp: otp }))
+            .then(function(data) {
+                UI.renderResult(resultBlock, mapLandingSubscriptionResult(data));
+                resetOtpStep();
+            })
+            .catch(function(err) {
+                UI.renderResult(resultBlock, {
+                    status: 'error',
+                    message: i18n.t('result.apiError') + (err.message || i18n.t('result.errorMsg'))
+                });
+            })
+            .finally(function() {
+                UI.hideLoading(submitBtn);
+            });
+    }
+
+    return { init: init };
+})();
+
+/* ===== Bootstrap ===== */
+document.addEventListener('DOMContentLoaded', function() {
+    i18n.init();
+    App.init();
+});
+</script>
+
+</body>
+</html>

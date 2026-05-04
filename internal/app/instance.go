@@ -10,6 +10,7 @@ import (
 	httpt "github.com/Armor-ru/sds-go/pkg/transport/http"
 	"github.com/Armor-ru/sds-go/pkg/types"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/google/uuid"
 
 	"github.com/spf13/cast"
@@ -48,6 +49,11 @@ func (s *Viva) InitHandlers() {
 		s.extTransport.Subscribe("POST /landing/confirm-subscription", s.LandingConfirmSubscriptionHandler)
 		s.extTransport.Subscribe("GET /landing/subscriber-info/:phoneNum", s.LandingGetSubscriberInfoGETHandler)
 		s.extTransport.Subscribe("POST /landing/subscriber-info", s.LandingGetSubscriberInfoPOSTHandler)
+
+		s.extTransport.Subscribe("POST /landing/:locale/init-subscription", s.LandingInitSubscriptionLocalizedHandler)
+		s.extTransport.Subscribe("POST /landing/:locale/confirm-subscription", s.LandingConfirmSubscriptionLocalizedHandler)
+		s.extTransport.Subscribe("GET /landing/:locale/subscriber-info/:phoneNum", s.LandingGetSubscriberInfoGETLocalizedHandler)
+		s.extTransport.Subscribe("POST /landing/:locale/subscriber-info", s.LandingGetSubscriberInfoPOSTLocalizedHandler)
 	}
 
 	if s.intTransport != nil {
@@ -73,6 +79,15 @@ func (s *Viva) initMiddleWare() {
 		logger.Warn().Msg("extTransport is not *http.Transport; webhook signature middleware skipped")
 		return
 	}
+	// Лендинг со статики (другой порт / CDN) — браузер шлёт cross-origin POST.
+	ht.Middleware(cors.New(cors.Config{
+		Next: func(c *fiber.Ctx) bool {
+			return !strings.HasPrefix(c.Path(), "/landing/")
+		},
+		AllowOrigins: "*",
+		AllowMethods: "GET,POST,OPTIONS",
+		AllowHeaders: "Content-Type,Accept",
+	}))
 	ht.Middleware(func(c *fiber.Ctx) error {
 		if strings.HasPrefix(c.Path(), "/landing/") {
 			return c.Next()
@@ -96,12 +111,12 @@ func (s *Viva) ExtAppPartnerProductRemoveHandler(ctx types.HandlerContext) {
 func (s *Viva) handleCreate(ctx types.HandlerContext, orderType types.OrderType) {
 	data := ExtReq{}
 	ctx.Data(&data)
-	s.sendOrderCreate(orderType, data.PhoneNum, data.ProductCode, data.SmsScenario)
+	s.sendOrderCreate(orderType, data.PhoneNum, data.ProductCode, data.SmsScenario, data.Locale)
 	_ = ctx.Response("")
 }
 
 // sendOrderCreate шлёт order/create в NATS (как обработчик вебхука ExtAppPartneerProductActivationRequest и др.).
-func (s *Viva) sendOrderCreate(orderType types.OrderType, phone, externalID, smsScenario string) {
+func (s *Viva) sendOrderCreate(orderType types.OrderType, phone, externalID, smsScenario, smsLocale string) {
 	if s.intTransport == nil {
 		logger.Warn().Msg("intTransport nil, skip order/create")
 		return
@@ -145,7 +160,8 @@ func (s *Viva) sendOrderCreate(orderType types.OrderType, phone, externalID, sms
 		},
 		CustomData: types.JSON{
 			CDVivaWebhook:   wh,
-			CDSmsScenario: strings.TrimSpace(smsScenario),
+			CDSmsScenario:   strings.TrimSpace(smsScenario),
+			CDSmsLocale:     LocaleOrDefault(smsLocale),
 		},
 		Items: items,
 	}
@@ -179,15 +195,20 @@ func (s *Viva) onCompletedHandler(ctx types.HandlerContext) {
 
 	wh := strings.TrimSpace(cast.ToString(order.CustomData[CDVivaWebhook]))
 	scenarioHint := strings.TrimSpace(cast.ToString(order.CustomData[CDSmsScenario]))
+	locale := orderSmsLocale(order)
 
 	switch wh {
 	case WHActivation:
-		s.sendRenewSms(order, phone, scenarioHint)
+		s.sendRenewSms(order, phone, scenarioHint, locale)
 	case WHRemove:
-		s.sendRemoveSms(order, phone, scenarioHint)
+		s.sendRemoveSms(order, phone, scenarioHint, locale)
 	default:
-		s.sendNewActivationSms(order, phone)
+		s.sendNewActivationSms(order, phone, locale)
 	}
+}
+
+func orderSmsLocale(order types.OrderResponse) string {
+	return LocaleOrDefault(cast.ToString(order.CustomData[CDSmsLocale]))
 }
 
 func orderPhone(order types.OrderResponse) string {
@@ -198,7 +219,7 @@ func orderPhone(order types.OrderResponse) string {
 	return strings.TrimSpace(cast.ToString(raw))
 }
 
-func (s *Viva) sendNewActivationSms(order types.OrderResponse, phone string) {
+func (s *Viva) sendNewActivationSms(order types.OrderResponse, phone, locale string) {
 	if len(order.Items) == 0 {
 		logger.Error().Str("orderId", order.ID).Msg("can not send notify, order items is empty")
 		return
@@ -246,6 +267,7 @@ func (s *Viva) sendNewActivationSms(order types.OrderResponse, phone string) {
 		ProductLabel: cast.ToString(item.Product.Name),
 		LicenseKey:   activationCode,
 		DownloadURL:  downloadURL,
+		Locale:       locale,
 	}
 	if err := s.smppSendScenario(phone, Sms2Welcome, payload); err != nil {
 		logger.Error().Str("orderId", order.ID).Err(err).Msg("SMPP sms2")
@@ -258,13 +280,13 @@ func (s *Viva) sendNewActivationSms(order types.OrderResponse, phone string) {
 	logger.Info().Str("orderId", order.ID).Str("phone", phone).Msg("SPEC §8 sms2+sms3 sent")
 }
 
-func (s *Viva) sendRenewSms(order types.OrderResponse, phone, scenarioHint string) {
+func (s *Viva) sendRenewSms(order types.OrderResponse, phone, scenarioHint, locale string) {
 	sc := Sms4Paid
 	switch SmsScenario(scenarioHint) {
 	case Sms5TrialRemind, Sms15Booster, Sms4Paid:
 		sc = SmsScenario(scenarioHint)
 	}
-	payload := SmsScenarioPayload{ProductLabel: productLabelFromOrder(order)}
+	payload := SmsScenarioPayload{ProductLabel: productLabelFromOrder(order), Locale: locale}
 	if sc == Sms5TrialRemind && order.EndTime != nil {
 		payload.TrialEndDate = order.EndTime.Format("02.01.2006")
 	}
@@ -273,12 +295,12 @@ func (s *Viva) sendRenewSms(order types.OrderResponse, phone, scenarioHint strin
 	}
 }
 
-func (s *Viva) sendRemoveSms(order types.OrderResponse, phone, scenarioHint string) {
+func (s *Viva) sendRemoveSms(order types.OrderResponse, phone, scenarioHint, locale string) {
 	sc := SmsServiceRemoved
 	if SmsScenario(scenarioHint) == Sms14NoFunds {
 		sc = Sms14NoFunds
 	}
-	payload := SmsScenarioPayload{ProductLabel: productLabelFromOrder(order)}
+	payload := SmsScenarioPayload{ProductLabel: productLabelFromOrder(order), Locale: locale}
 	if err := s.smppSendScenario(phone, sc, payload); err != nil {
 		logger.Error().Str("orderId", order.ID).Err(err).Str("scenario", string(sc)).Msg("SMPP remove webhook")
 	}

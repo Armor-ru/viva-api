@@ -116,7 +116,6 @@ func (c *Client) doJSON(ctx context.Context, method, path string, body any, out 
 	return json.Unmarshal(raw, out)
 }
 
-// Viva биндит phoneNum / productName (и otp) из query string, не из JSON body — см. docs/bor.json.
 func subscriptionPostPath(path, phoneNum, productName string, otp *string) string {
 	q := url.Values{}
 	q.Set("phoneNum", strings.TrimSpace(phoneNum))
