@@ -49,9 +49,14 @@
       "description": "Код из SMS (вариант B → confirm)"
     },
     {
+      "key": "webhook_secret",
+      "value": "RAxLSV1ZJQSCNgxyLrH7P5o9Ep4Xv9ZNX9FV2YMkPcY0NkTlLc9rc81CN4yyLacQ",
+      "description": "Тот же секрет, что extTransport.secret в viva-api.yaml. Папка «2. Viva → BFF webhooks» считает X-Signature в pre-request из тела + этого ключа."
+    },
+    {
       "key": "webhook_signature",
-      "value": "c99717d326116bc080abf341d2d3f899713b77a4d398b5be87a571f4d8dc714a",
-      "description": "X-Signature для тела вебхука + секрет TestSecretKey"
+      "value": "",
+      "description": "Заполняется автоматически pre-request скриптом папки «2. Viva → BFF webhooks» перед отправкой (не редактировать вручную)."
     },
     {
       "key": "landing_locale",
@@ -600,7 +605,33 @@
     },
     {
       "name": "2. Viva → BFF webhooks (X-Signature)",
-      "description": "§6 Webhook Events — подпись **X-Signature** = HMAC-SHA256(hex lower) от **точного** JSON-тела и секрета из `extTransport.secret` (как в примере C# в viva.md).",
+      "description": "§6 Webhook Events — подпись **X-Signature** = HMAC-SHA256, hex lower, от **байт-в-байт того же JSON**, что в теле запроса, и секрета `{{webhook_secret}}` (= `extTransport.secret`). Pre-request считает подпись и (1) кладёт в `webhook_signature`, (2) **проставляет заголовок через upsert** — иначе Postman часто шлёт пустой `X-Signature`, потому что резолвит заголовки до обновления переменной.",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const secret = pm.collectionVariables.get('webhook_secret');",
+              "if (!secret) { throw new Error('Задайте collection variable webhook_secret (как в viva-api.yaml extTransport.secret)'); }",
+              "let rawBody = pm.request.body ? (pm.request.body.raw || '') : '';",
+              "if (typeof pm.variables.replaceIn === 'function') {",
+              "    rawBody = pm.variables.replaceIn(rawBody);",
+              "} else {",
+              "    ['msisdn', 'webhook_product_code', 'bff_base_url'].forEach((k) => {",
+              "        const v = pm.collectionVariables.get(k);",
+              "        if (v !== undefined && v !== null) {",
+              "            rawBody = rawBody.split('{{' + k + '}}').join(v);",
+              "        }",
+              "    });",
+              "}",
+              "const sig = CryptoJS.HmacSHA256(rawBody, secret).toString(CryptoJS.enc.Hex);",
+              "pm.collectionVariables.set('webhook_signature', sig);",
+              "pm.request.headers.upsert({ key: 'X-Signature', value: sig });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
       "item": [
         {
           "name": "ExtAppPartneerProductActivationRequest",
@@ -613,7 +644,8 @@
               },
               {
                 "key": "X-Signature",
-                "value": "{{webhook_signature}}"
+                "value": "{{webhook_signature}}",
+                "description": "Значение подставляет pre-request скрипт папки из тела + webhook_secret"
               }
             ],
             "body": {
@@ -640,7 +672,8 @@
               },
               {
                 "key": "X-Signature",
-                "value": "{{webhook_signature}}"
+                "value": "{{webhook_signature}}",
+                "description": "Значение подставляет pre-request скрипт папки из тела + webhook_secret"
               }
             ],
             "body": {
@@ -667,7 +700,8 @@
               },
               {
                 "key": "X-Signature",
-                "value": "{{webhook_signature}}"
+                "value": "{{webhook_signature}}",
+                "description": "Значение подставляет pre-request скрипт папки из тела + webhook_secret"
               }
             ],
             "body": {

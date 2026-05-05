@@ -7,7 +7,7 @@ intTransport:
 extTransport:
   server: 0.0.0.0:4000
   secret:
-    - TestSecretKey
+    - RAxLSV1ZJQSCNgxyLrH7P5o9Ep4Xv9ZNX9FV2YMkPcY0NkTlLc9rc81CN4yyLacQ
 smpp:
   endpoint: ["217.76.1.74:2775", "217.76.1.86:2775"]
   auth:
