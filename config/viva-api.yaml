@@ -24,6 +24,6 @@ vivaApi:
   baseURL: "https://viva.zsquare.ru/api/rest"
   userName: "ZsquareLLC"
   password: "KasperskySafeKids2026%&!"
-  defaultProduct: "SAFEKIDS"
+  defaultProduct: "SAFEKID"
   # externalId для order/create после успешного Confirm на /landing/* (тот же UUID, что productCode во вебхуке ActivationRequest)
   orderProductCode: "98e226fe-ce64-5ccb-885f-a5f9b2d77cc5"

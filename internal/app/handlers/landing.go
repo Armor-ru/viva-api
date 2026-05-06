@@ -121,8 +121,11 @@ func handleInit(v *viva_api.Viva, ctx types.HandlerContext, pathLocale string) {
 		return
 	}
 
-	if !fromHeader && !body.SkipConfirm {
-		respondError(ctx, 400, "without carrier MSISDN header, skipConfirm must be true")
+	// Security hardening: do not allow OTP-less confirmation via Header Enrichment.
+	// Always require explicit OTP confirmation via /landing/confirm-subscription.
+	_ = fromHeader
+	if !body.SkipConfirm {
+		respondError(ctx, 400, "skipConfirm must be true; confirm requires OTP")
 		return
 	}
 
@@ -136,30 +139,7 @@ func handleInit(v *viva_api.Viva, ctx types.HandlerContext, pathLocale string) {
 		return
 	}
 
-	if body.SkipConfirm {
-		respondOK(ctx, map[string]interface{}{"init": initRes, "locale": locale})
-		return
-	}
-
-	confirmRes, err := v.VivaPartner.ConfirmSubscription(c, phone, product, nil)
-	if err != nil {
-		logger.Error().Err(err).Str("phone", phone).Msg("Viva ConfirmSubscription")
-		respondError(ctx, 502, err.Error())
-		return
-	}
-
-	if confirmRes.ResultCode == 7 {
-		respondOK(ctx, map[string]interface{}{"init": initRes, "confirm": confirmRes, "locale": locale})
-		return
-	}
-
-	if confirmRes.ResultCode != 0 {
-		respondError(ctx, 502, vivaErrorMessage(confirmRes))
-		return
-	}
-
-	emitNewOrder(v, phone, body.ProductCode, body.SmsScenario, locale)
-	respondOK(ctx, map[string]interface{}{"init": initRes, "confirm": confirmRes, "locale": locale})
+	respondOK(ctx, map[string]interface{}{"init": initRes, "locale": locale})
 }
 
 func handleConfirm(v *viva_api.Viva, ctx types.HandlerContext, pathLocale string) {
