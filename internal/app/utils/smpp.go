@@ -1,4 +1,4 @@
-package viva_api
+package utils
 
 import (
 	"math/rand"
@@ -8,7 +8,6 @@ import (
 	"github.com/fiorix/go-smpp/smpp/pdu/pdutext"
 )
 
-// Error
 type SmppError struct {
 	Message string
 	Err     error
@@ -26,7 +25,15 @@ func (e *SmppError) Unwrap() error {
 	return e.Err
 }
 
-// SMPP
+type SmppConfig struct {
+	Endpoint []string `yaml:"endpoint" json:"endpoint"`
+	Auth     struct {
+		User     string `yaml:"user" json:"user"`
+		Password string `yaml:"password" json:"password"`
+	} `yaml:"auth" json:"auth"`
+	Template string `yaml:"template" json:"template"`
+}
+
 type SmppSender struct {
 	cfg SmppConfig
 }
