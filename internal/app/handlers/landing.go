@@ -109,7 +109,7 @@ func handleInit(v *viva_api.Viva, ctx types.HandlerContext, pathLocale string) {
 		return
 	}
 
-	product := pickProduct(v, body.ProductName)
+	product := strings.TrimSpace(body.ProductName)
 	if product == "" {
 		respondError(ctx, 400, "productName required")
 		return
@@ -156,7 +156,7 @@ func handleConfirm(v *viva_api.Viva, ctx types.HandlerContext, pathLocale string
 		return
 	}
 
-	product := pickProduct(v, body.ProductName)
+	product := strings.TrimSpace(body.ProductName)
 	if product == "" {
 		respondError(ctx, 400, "productName required")
 		return
@@ -194,7 +194,12 @@ func handleConfirm(v *viva_api.Viva, ctx types.HandlerContext, pathLocale string
 		return
 	}
 
-	emitNewOrder(v, phone, body.ProductCode, body.SmsScenario, locale)
+	productCode := strings.TrimSpace(body.ProductCode)
+	if productCode == "" {
+		respondError(ctx, 400, "productCode required")
+		return
+	}
+	service.SendOrderCreate(v, types.OrderTypeNew, phone, productCode, body.SmsScenario, locale)
 	respondOK(ctx, map[string]interface{}{"confirm": res, "locale": locale})
 }
 
@@ -265,14 +270,6 @@ func ensurePartner(v *viva_api.Viva, ctx types.HandlerContext) bool {
 	return true
 }
 
-func pickProduct(v *viva_api.Viva, name string) string {
-	p := strings.TrimSpace(name)
-	if p == "" {
-		p = v.DefaultProductName
-	}
-	return p
-}
-
 func extractMSISDN(ctx types.HandlerContext, bodyPhone string) (string, bool, error) {
 	var headers map[string]string
 	ctx.Headers(&headers)
@@ -299,14 +296,6 @@ func extractMSISDN(ctx types.HandlerContext, bodyPhone string) (string, bool, er
 func cleanMSISDN(s string) string {
 	s = strings.TrimSpace(s)
 	return strings.TrimPrefix(s, "+")
-}
-
-func emitNewOrder(v *viva_api.Viva, phone, productCode, smsScenario, locale string) {
-	pc := strings.TrimSpace(productCode)
-	if pc == "" {
-		pc = strings.TrimSpace(v.OrderProductCode)
-	}
-	service.SendOrderCreate(v, types.OrderTypeNew, phone, pc, smsScenario, locale)
 }
 
 func respondOK(ctx types.HandlerContext, data interface{}) {

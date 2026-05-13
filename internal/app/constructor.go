@@ -1,8 +1,6 @@
 package viva_api
 
 import (
-	"strings"
-
 	"github.com/Armor-ru/sds-go/pkg/types"
 	"github.com/Armor-ru/viva-api/internal/app/utils"
 )
@@ -49,17 +47,5 @@ func WithAccountId(id string) func(*Viva) {
 func WithVivaPartner(api PartnerSubscriptionAPI) func(*Viva) {
 	return func(s *Viva) {
 		s.VivaPartner = api
-	}
-}
-
-func WithDefaultProductName(name string) func(*Viva) {
-	return func(s *Viva) {
-		s.DefaultProductName = strings.TrimSpace(name)
-	}
-}
-
-func WithOrderProductCode(code string) func(*Viva) {
-	return func(s *Viva) {
-		s.OrderProductCode = strings.TrimSpace(code)
 	}
 }

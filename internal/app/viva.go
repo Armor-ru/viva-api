@@ -22,9 +22,7 @@ type Viva struct {
 	SmsTpl     *template.Template
 	SmppSender *utils.SmppSender
 
-	VivaPartner        PartnerSubscriptionAPI
-	DefaultProductName string
-	OrderProductCode   string
+	VivaPartner PartnerSubscriptionAPI
 
 	AccountId string
 }

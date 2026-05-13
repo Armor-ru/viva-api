@@ -32,11 +32,9 @@ type Conf struct {
 	AccountId   string            `yaml:"accountId"`
 
 	VivaAPI struct {
-		BaseURL          string `yaml:"baseURL"`
-		UserName         string `yaml:"userName"`
-		Password         string `yaml:"password"`
-		DefaultProduct   string `yaml:"defaultProduct"`
-		OrderProductCode string `yaml:"orderProductCode"`
+		BaseURL  string `yaml:"baseURL"`
+		UserName string `yaml:"userName"`
+		Password string `yaml:"password"`
 	} `yaml:"vivaApi"`
 }
 
@@ -88,8 +86,6 @@ func main() {
 		viva_api.WithSmppConfig(cfg.SMPP),
 		viva_api.WithAccountId(cfg.AccountId),
 		viva_api.WithVivaPartner(partner),
-		viva_api.WithDefaultProductName(cfg.VivaAPI.DefaultProduct),
-		viva_api.WithOrderProductCode(cfg.VivaAPI.OrderProductCode),
 	)
 	handlers.Register(&v)
 
