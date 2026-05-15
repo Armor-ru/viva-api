@@ -11,13 +11,12 @@ type Channels struct {
 }
 
 type SmppConfig struct {
-	Endpoint     []string                       `yaml:"endpoint"`
-	Auth         struct {
-		User     string `yaml:"user"`
-		Password string `yaml:"password"`
-	} `yaml:"auth"`
-	Template     string                         `yaml:"template"`
-	SmsTemplates map[string]map[string]string   `yaml:"smsTemplates"`
+	Endpoint []string `yaml:"endpoint" json:"endpoint"`
+	Auth     struct {
+		User     string `yaml:"user" json:"user"`
+		Password string `yaml:"password" json:"password"`
+	} `yaml:"auth" json:"auth"`
+	Template string `yaml:"template" json:"template"`
 }
 
 type ExtReq struct {
@@ -27,7 +26,7 @@ type ExtReq struct {
 	Locale      string `json:"locale,omitempty"`
 }
 
-type SmsTplData struct {
+type SmsData struct {
 	ProductName    string
 	ProductLabel   string
 	Quantity       int
@@ -38,20 +37,11 @@ type SmsTplData struct {
 }
 
 const (
-	CDVivaWebhook   = "vivaWebhook"
-	CDSmsScenario   = "smsScenario"
-	CDSmsLocale     = "smsLocale"
-	WHActivationReq = "activationRequest"
-	WHActivation    = "activation"
-	WHRemove        = "remove"
-)
+	cdVivaWebhook = "vivaWebhook"
+	cdSmsScenario = "smsScenario"
+	cdSmsLocale   = "smsLocale"
 
-const (
-	scSms2  = "sms2"
-	scSms3  = "sms3"
-	scSms4  = "sms4"
-	scSms5  = "sms5"
-	scSms14 = "sms14"
-	scSms15 = "sms15"
-	scOff   = "sms_deactivated"
+	whActivationReq = "activationRequest"
+	whActivation    = "activation"
+	whRemove        = "remove"
 )
