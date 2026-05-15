@@ -1,128 +1,93 @@
 package viva_api
 
 import (
-	"bytes"
 	"fmt"
 	"strings"
-	"text/template"
-
-	"github.com/Armor-ru/sds-go/pkg/logger"
-	"github.com/Armor-ru/sds-go/pkg/tplext"
 )
 
-func defaultSmsTemplates() map[string]map[string]string {
-	return map[string]map[string]string{
-		scSms2: {
-			smsLangEN: "Congratulations! {{.ProductLabel}} is active. 2-day trial, then 50 AMD/day.",
-			smsLangHY: "Շնորհավորում ենք: {{.ProductLabel}} ակտիվ է: 2 օր փորձ, այնուհետև 50 դրամ/օր:",
-			smsLangRU: "Поздравляем! Подписка {{.ProductLabel}} активна. Пробный период 2 дня. Далее 50 AMD/день.",
-		},
-		scSms3: {
-			smsLangEN: `"{{.ProductLabel}}": {{.LicenseKey}}. Link: {{.DownloadURL}}`,
-			smsLangHY: `"{{.ProductLabel}}": {{.LicenseKey}}. Հղում: {{.DownloadURL}}`,
-			smsLangRU: `"{{.ProductLabel}}": {{.LicenseKey}}. Ссылка: {{.DownloadURL}}`,
-		},
-		scSms4: {
-			smsLangEN: "Chargeable {{.ProductLabel}} is active. 50 AMD/day.",
-			smsLangHY: "{{.ProductLabel}} վճարովի տարբերակը միացված է: 50 դրամ/օր:",
-			smsLangRU: "Платная версия {{.ProductLabel}} подключена. Цена 50 AMD/день.",
-		},
-		scSms5: {
-			smsLangEN: `{{if .TrialEndDate}}{{.ProductLabel}} trial ends {{.TrialEndDate}}. Paid plan will renew if balance is OK.{{else}}{{.ProductLabel}} trial ends soon.{{end}}`,
-			smsLangHY: `{{if .TrialEndDate}}{{.ProductLabel}} փորձնական շրջանը ավարտվում է {{.TrialEndDate}}:{{else}}{{.ProductLabel}} փորձնական շրջանը շուտով ավարտվում է:{{end}}`,
-			smsLangRU: `{{if .TrialEndDate}}Пробный период {{.ProductLabel}} истекает {{.TrialEndDate}}. Пополните счёт вовремя.{{else}}Пробный период {{.ProductLabel}} скоро закончится.{{end}}`,
-		},
-		scSms14: {
-			smsLangEN: `Top up via *221# or https://cabinet.viva.am/epay2/ to continue Kaspersky Safe Kids.`,
-			smsLangHY: `Լիցքավորեք հաշիվը *221# կամ https://cabinet.viva.am/epay2/ Kaspersky Safe Kids-ի համար:`,
-			smsLangRU: "Пополните счёт через *221# или https://cabinet.viva.am/epay2/ для продолжения Kaspersky Safe Kids.",
-		},
-		scSms15: {
-			smsLangEN: "Long time no see. Top up your balance to continue Kaspersky Safe Kids.",
-			smsLangHY: "Վաղուց չենք հանդիպել: Լիցքավորեք հաշիվը՝ շարունակելու Kaspersky Safe Kids:",
-			smsLangRU: "Давно не встречались. Пополните баланс для продолжения Kaspersky Safe Kids.",
-		},
-		scOff: {
-			smsLangEN: "{{.ProductLabel}} service deactivated.",
-			smsLangHY: "{{.ProductLabel}} ծառայությունն ապաակտիվացված է:",
-			smsLangRU: "Услуга {{.ProductLabel}} деактивирована.",
-		},
+func smsText(scenario, lang string, d SmsData) string {
+	product := strings.TrimSpace(d.ProductLabel)
+	if product == "" {
+		product = "Kaspersky Safe Kids"
 	}
-}
+	lang = localeOrDefault(lang)
 
-func mergeSmsTemplates(cfg map[string]map[string]string) map[string]map[string]string {
-	out := defaultSmsTemplates()
-	for scenario, locales := range cfg {
-		if out[scenario] == nil {
-			out[scenario] = make(map[string]string)
+	switch scenario {
+	case "sms2":
+		switch lang {
+		case "en":
+			return fmt.Sprintf("Congratulations! %s is active. 2-day trial, then 50 AMD/day.", product)
+		case "hy":
+			return fmt.Sprintf("Շնորհավորում ենք: %s ակտիվ է: 2 օր փորձ, այնուհետև 50 դրամ/օր:", product)
+		default:
+			return fmt.Sprintf("Поздравляем! Подписка %s активна. Пробный период 2 дня. Далее 50 AMD/день.", product)
 		}
-		for loc, text := range locales {
-			if strings.TrimSpace(text) != "" {
-				out[scenario][localeOrDefault(loc)] = text
+	case "sms3":
+		key, url := strings.TrimSpace(d.LicenseKey), strings.TrimSpace(d.DownloadURL)
+		switch lang {
+		case "en":
+			return fmt.Sprintf(`"%s": %s. Link: %s`, product, key, url)
+		case "hy":
+			return fmt.Sprintf(`"%s": %s. Հղում: %s`, product, key, url)
+		default:
+			return fmt.Sprintf(`"%s": %s. Ссылка: %s`, product, key, url)
+		}
+	case "sms4":
+		switch lang {
+		case "en":
+			return fmt.Sprintf("Chargeable %s is active. 50 AMD/day.", product)
+		case "hy":
+			return fmt.Sprintf("%s վճարովի տարբերակը միացված է: 50 դրամ/օր:", product)
+		default:
+			return fmt.Sprintf("Платная версия %s подключена. Цена 50 AMD/день.", product)
+		}
+	case "sms5":
+		end := strings.TrimSpace(d.TrialEndDate)
+		switch lang {
+		case "en":
+			if end != "" {
+				return fmt.Sprintf("%s trial ends %s. Paid plan will renew if balance is OK.", product, end)
 			}
-		}
-	}
-	return out
-}
-
-func (s *Viva) initSMS() {
-	tplText := s.smpp.Template
-	if tplText == "" {
-		tplText = "{{.ProductName}}{{ if .Quantity }} for {{ pluralizeEn .Quantity \"device\" \"devices\" }}{{ end }}\n" +
-			"Activation code: {{.ActivationCode}}\n" +
-			"Download link: {{.DownloadURL}}"
-	}
-	s.activationTpl, _ = template.New("activation").Funcs(tplext.Funcs).Parse(tplText)
-	s.smppSender = NewSmppSender(s.smpp)
-
-	raw := mergeSmsTemplates(s.smpp.SmsTemplates)
-	s.scenarioTpl = make(map[string]map[string]*template.Template)
-	for scenario, locales := range raw {
-		s.scenarioTpl[scenario] = make(map[string]*template.Template)
-		for loc, text := range locales {
-			tpl, err := template.New(scenario + "_" + loc).Parse(text)
-			if err != nil {
-				logger.Warn().Str("scenario", scenario).Str("locale", loc).Err(err).Msg("skip invalid sms template")
-				continue
+			return fmt.Sprintf("%s trial ends soon.", product)
+		case "hy":
+			if end != "" {
+				return fmt.Sprintf("%s փորձնական շրջանը ավարտվում է %s:", product, end)
 			}
-			s.scenarioTpl[scenario][loc] = tpl
+			return fmt.Sprintf("%s փորձնական շրջանը շուտով ավարտվում է:", product)
+		default:
+			if end != "" {
+				return fmt.Sprintf("Пробный период %s истекает %s. Пополните счёт вовремя.", product, end)
+			}
+			return fmt.Sprintf("Пробный период %s скоро закончится.", product)
 		}
+	case "sms14":
+		switch lang {
+		case "en":
+			return `Top up via *221# or https://cabinet.viva.am/epay2/ to continue Kaspersky Safe Kids.`
+		case "hy":
+			return `Լիցքավորեք հաշիվը *221# կամ https://cabinet.viva.am/epay2/ Kaspersky Safe Kids-ի համար:`
+		default:
+			return "Пополните счёт через *221# или https://cabinet.viva.am/epay2/ для продолжения Kaspersky Safe Kids."
+		}
+	case "sms15":
+		switch lang {
+		case "en":
+			return "Long time no see. Top up your balance to continue Kaspersky Safe Kids."
+		case "hy":
+			return "Վաղուց չենք հանդիպել: Լիցքավորեք հաշիվը՝ շարունակելու Kaspersky Safe Kids:"
+		default:
+			return "Давно не встречались. Пополните баланс для продолжения Kaspersky Safe Kids."
+		}
+	case "sms_deactivated":
+		switch lang {
+		case "en":
+			return fmt.Sprintf("%s service deactivated.", product)
+		case "hy":
+			return fmt.Sprintf("%s ծառայությունն ապաակտիվացված է:", product)
+		default:
+			return fmt.Sprintf("Услуга %s деактивирована.", product)
+		}
+	default:
+		return ""
 	}
-}
-
-func (s *Viva) sendScenario(phone, scenario, locale string, data SmsTplData) error {
-	if s.smppSender == nil {
-		return fmt.Errorf("smppSender is nil")
-	}
-	lang := localeOrDefault(locale)
-	if strings.TrimSpace(data.ProductLabel) == "" {
-		data.ProductLabel = "Kaspersky Safe Kids"
-	}
-	if strings.TrimSpace(data.ProductName) == "" {
-		data.ProductName = data.ProductLabel
-	}
-
-	byLoc := s.scenarioTpl[scenario]
-	if byLoc == nil {
-		return fmt.Errorf("unknown sms scenario %q", scenario)
-	}
-	tpl := byLoc[lang]
-	if tpl == nil {
-		tpl = byLoc[smsLangHY]
-	}
-	if tpl == nil {
-		return fmt.Errorf("no template for scenario %q locale %q", scenario, lang)
-	}
-
-	var buf bytes.Buffer
-	if err := tpl.Execute(&buf, data); err != nil {
-		return err
-	}
-	body := strings.TrimSpace(buf.String())
-	if body == "" {
-		return fmt.Errorf("empty sms body for scenario %s", scenario)
-	}
-
-	logger.Info().Str("sender", "SMPP").Str("scenario", scenario).Str("msisdn", phone).Msg("SMS")
-	return s.smppSender.Send(phone, body)
 }
