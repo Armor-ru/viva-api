@@ -22,7 +22,7 @@ func TestSmsTemplatePluralize(t *testing.T) {
 	}
 
 	var b bytes.Buffer
-	err = tpl.Execute(&b, viva_api.SmsData{
+	err = tpl.Execute(&b, viva_api.SmsTplData{
 		ProductName:    "SafeKids",
 		Quantity:       22,
 		ActivationCode: "ABC",

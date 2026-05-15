@@ -5,11 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Armor-ru/viva-api/internal/app/utils"
+	viva_api "github.com/Armor-ru/viva-api/internal/app"
 	"github.com/fiorix/go-smpp/smpp"
 )
-
-// Это интеграционные тесты для проверки отправки и подключения к smpp
 
 func TestSMPP_Send_Integration(t *testing.T) {
 	if os.Getenv("SMPP_IT") != "1" {
@@ -29,11 +27,11 @@ func TestSMPP_Send_Integration(t *testing.T) {
 		text = "viva-api smpp integration test"
 	}
 
-	cfg := utils.SmppConfig{Endpoint: []string{endpoint}}
+	cfg := viva_api.SmppConfig{Endpoint: []string{endpoint}}
 	cfg.Auth.User = user
 	cfg.Auth.Password = pass
 
-	sender := utils.NewSmppSender(cfg)
+	sender := viva_api.NewSmppSender(cfg)
 
 	if err := sender.Send(msisdn, text); err != nil {
 		t.Fatalf("smpp send failed: %v", err)
