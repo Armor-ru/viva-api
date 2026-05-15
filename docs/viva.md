@@ -555,13 +555,14 @@ Access password: Viva_Subscription_Management
    Тело: `productName` (обяз.), `skipConfirm: true` (обяз.), `phoneNum` **или** заголовок `X-MSISDN` / `X-Msisdn` / `X-Phone-Number`.  
    Вызов: Viva **InitSubscription** (OTP на стороне Viva). Подтверждение без OTP через init **не выполняется**.
 
-2. **Confirm** — `POST /landing/confirm-subscription`.  
+2. **Confirm** — `POST /landing/confirm-subscription` (или `/landing/:locale/confirm-subscription`).  
    Тело: `phoneNum` (или MSISDN в заголовке), `productName`, `otp`, **`productCode`** (обяз. для заказа в Armor).  
+   Опционально: `locale`, `smsScenario` в JSON.  
    Вызов: Viva **ConfirmSubscription**. При `resultCode == 0` — `order/create` (New). При `resultCode == 7` — ответ 200 без заказа (уже активна).
 
-3. **Subscriber** — `GET /landing/subscriber-info/:phoneNum` или `POST /landing/subscriber-info` → Viva **GetSubscriberInfo**.
+**GetSubscriberInfo** — только прямой вызов Viva REST (§3.1, папка «0. Viva REST» в Postman); BFF не экспонирует `/landing/.../subscriber-info`.
 
-Локаль SMS (`order/customData.smsLocale`): сегмент `:locale` в пути (`en`, `ru`, `hy` и алиасы) или поле `locale` в JSON. Логика: `internal/app/locale.go`.
+Локаль SMS (`order/customData.smsLocale`): сегмент `:locale` в пути (`en`, `ru`, `hy` и алиасы) или поле `locale` в JSON. Логика: `internal/app/landing.go` (`pickLocale`, `parseLocale`).
 
 ### 7.2 Маршруты BFF
 
@@ -569,12 +570,8 @@ Access password: Viva_Subscription_Management
 |--------|------|------------|
 | POST | `/landing/init-subscription` | InitSubscription |
 | POST | `/landing/confirm-subscription` | ConfirmSubscription + order/create |
-| GET | `/landing/subscriber-info/:phoneNum` | GetSubscriberInfo |
-| POST | `/landing/subscriber-info` | GetSubscriberInfo (body / X-MSISDN) |
 | POST | `/landing/:locale/init-subscription` | Init + локаль в пути |
 | POST | `/landing/:locale/confirm-subscription` | Confirm + локаль |
-| GET | `/landing/:locale/subscriber-info/:phoneNum` | Subscriber + локаль |
-| POST | `/landing/:locale/subscriber-info` | Subscriber + локаль |
 | POST | `/ExtAppPartneerProductActivationRequest` | Вебхук New (§6), **X-Signature** |
 | POST | `/ExtAppPartneerProductActivation` | Вебхук Renew |
 | POST | `/ExtAppPartneerProductRemove` | Вебхук Cancel / remove |
@@ -586,14 +583,14 @@ Access password: Viva_Subscription_Management
 ### 7.3 Конфиг и SMS
 
 - `vivaApi` — `baseURL`, `userName`, `password` для `internal/vivaclient`.
-- `smpp` — SMPP и опционально `smsTemplates` (сценарии `sms2`, `sms3`, `sms4`, …); без override — встроенные шаблоны в коде.
+- `smpp` — SMPP (`endpoint`, `auth`, опционально `template` для activation SMS). Тексты сценариев (`sms2`, `sms3`, `sms4`, `sms5`, `sms14`, `sms15`, `sms_deactivated`) заданы в коде (`internal/app/sms.go`).
 
 ### 7.4 Postman — папки коллекции
 
 | Папка | Содержимое |
 |-------|------------|
 | **0. Viva REST** | Прямые вызовы §2–§3.7 (токен, Init/Confirm/Remove в query) |
-| **1. Landing BFF** | Маршруты на `bff_base_url` |
+| **1. Landing BFF** | Init / Confirm на `bff_base_url` (с опциональным `:locale`) |
 | **2. Viva → BFF webhooks** | Три POST с auto **X-Signature** (pre-request) |
 
 Порядок проверки лендинга: Init (`skipConfirm: true`) → ввести `otp_code` → Confirm с `productCode`.

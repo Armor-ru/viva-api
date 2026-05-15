@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "viva-api BFF — Landing + Viva webhooks",
-    "description": "viva-api BFF + прямые вызовы Viva REST (`docs/viva.md` §7).\n\n**Лендинг:** Init (`skipConfirm: true`) → Confirm с `otp` и `productCode`. Init вызывает только Viva InitSubscription.\n\n**MSISDN:** заголовки `X-MSISDN` / `X-Msisdn` / `X-Phone-Number` или поле `phoneNum`.\n\n**Локаль SMS:** путь `/landing/:locale/...` (en|ru|hy и алиасы, см. `internal/app/locale.go`) или поле `locale` в JSON.\n\n**Вебхуки:** `X-Signature` = HMAC-SHA256 hex от тела JSON + `webhook_secret`.",
+    "description": "viva-api BFF + прямые вызовы Viva REST (`docs/viva.md` §7).\n\n**Лендинг:** Init (`skipConfirm: true`) → Confirm с `otp` и `productCode`. Init вызывает только Viva InitSubscription.\n\n**MSISDN:** заголовки `X-MSISDN` / `X-Msisdn` / `X-Phone-Number` или поле `phoneNum`.\n\n**Локаль SMS:** путь `/landing/:locale/...` (en|ru|hy и алиасы, см. `internal/app/landing.go`) или поле `locale` в JSON.\n\n**Subscriber info:** только через папку «0. Viva REST» (GetSubscriberInfo), BFF не проксирует subscriber-info.\n\n**Вебхуки:** `X-Signature` = HMAC-SHA256 hex от тела JSON + `webhook_secret`.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -325,7 +325,7 @@
     },
     {
       "name": "1. Landing BFF (ваш viva-api)",
-      "description": "BFF на `bff_base_url`. Без Bearer. Init: `skipConfirm: true`, `productName`. Confirm: `otp`, `productCode`. Папка 1b — маршруты с `:locale`.",
+      "description": "BFF на `bff_base_url`. Без Bearer. Маршруты: `POST /landing/init-subscription`, `POST /landing/confirm-subscription` и те же с префиксом `/landing/:locale/`. Init: `skipConfirm: true`, `productName`. Confirm: `otp`, `productCode`. GetSubscriberInfo — только в папке «0. Viva REST».",
       "item": [
         {
           "name": "A — Header Enrichment (X-MSISDN, без phoneNum в JSON)",
@@ -530,76 +530,8 @@
                 "description": "Локаль в пути → smsLocale в order/customData."
               },
               "response": []
-            },
-            {
-              "name": ":locale — GetSubscriberInfo GET",
-              "request": {
-                "method": "GET",
-                "header": [],
-                "url": "{{bff_base_url}}/landing/{{landing_locale}}/subscriber-info/{{msisdn}}",
-                "description": "Локаль проверяется (неверная → 400), на ответ Viva не влияет."
-              },
-              "response": []
-            },
-            {
-              "name": ":locale — GetSubscriberInfo POST",
-              "request": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"phoneNum\": \"{{msisdn}}\"\n}",
-                  "options": {
-                    "raw": {
-                      "language": "json"
-                    }
-                  }
-                },
-                "url": "{{bff_base_url}}/landing/{{landing_locale}}/subscriber-info",
-                "description": "Сверка сегмента :locale с телом при необходимости."
-              },
-              "response": []
             }
           ]
-        },
-        {
-          "name": "GetSubscriberInfo (GET по номеру в пути)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": "{{bff_base_url}}/landing/subscriber-info/{{msisdn}}",
-            "description": "Прокси к Viva `GET /api/Subscriber/{msisdn}`. Номер без `+` в path."
-          },
-          "response": []
-        },
-        {
-          "name": "GetSubscriberInfo (POST — body или X-MSISDN)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"phoneNum\": \"{{msisdn}}\"\n}",
-              "options": {
-                "raw": {
-                  "language": "json"
-                }
-              }
-            },
-            "url": "{{bff_base_url}}/landing/subscriber-info",
-            "description": "Тело можно заменить на `{}` и передать только заголовок **X-MSISDN** (как вариант A). Пустое тело без JSON не слать."
-          },
-          "response": []
         }
       ]
     },
