@@ -544,42 +544,72 @@ Access password: Viva_Subscription_Management
 
 ## 7. Partner BFF (viva-api) — Landing HTTP and Postman
 
-This section documents the **partner-side HTTP service viva-api** (BFF): it is **not** part of Viva’s hosted Ext-App API, but wraps the flows from §2–§6 for a web landing and for receiving Viva webhooks.
+Сервис **viva-api** (BFF) — HTTP на `extTransport` (по умолчанию `0.0.0.0:4000`). Проксирует Viva REST (`vivaApi` в `config/viva-api.yaml`) и принимает вебхуки §6.
 
-**Postman collection (all Viva §2–§4 methods + BFF + webhooks):** repository file `docs/viva-api-bff-landing.postman_collection.json` (collection name: *viva-api BFF — Landing + Viva webhooks*). Variables `bff_base_url` (default `http://localhost:4000`) and `viva_base_url` point at the BFF and at Viva REST respectively.
+**Postman:** `docs/viva-api-bff-landing.postman_collection.json`  
+**Переменные:** `bff_base_url` (BFF), `viva_base_url` (Viva REST), `webhook_secret` (= `extTransport.secret`).
 
-### 7.1 BFF routes (viva-api `extTransport`)
+### 7.1 Поток лендинга (init → confirm)
 
-| Method | Path | Purpose |
-|--------|------|---------|
-| POST | `/landing/init-subscription` | JSON: `phoneNum`, `productName`, optional `skipConfirm`, `locale`, `productCode`, `smsScenario`; or **Header Enrichment** via `X-MSISDN` / `X-Msisdn` / `X-Phone-Number`. Calls Viva **InitSubscription** and, when applicable, **ConfirmSubscription** without OTP. |
-| POST | `/landing/confirm-subscription` | JSON: `phoneNum`, `productName`, `otp`, optional `locale`, `productCode`. Calls Viva **ConfirmSubscription** with OTP. |
-| GET | `/landing/subscriber-info/:phoneNum` | Proxies Viva **GetSubscriberInfo** (§3.1). |
-| POST | `/landing/subscriber-info` | Same; MSISDN in JSON `phoneNum` or in `X-MSISDN`. |
-| POST | `/landing/:locale/init-subscription` | Same as init; `:locale` selects SMS language (aliases `en` / `ru` / `hy`). |
-| POST | `/landing/:locale/confirm-subscription` | |
-| GET | `/landing/:locale/subscriber-info/:phoneNum` | |
-| POST | `/landing/:locale/subscriber-info` | |
-| POST | `/ExtAppPartneerProductActivationRequest` | Webhook §6 — body `phoneNum`, `productCode`; header **X-Signature**. |
-| POST | `/ExtAppPartneerProductActivation` | Successful prolongation webhook. |
-| POST | `/ExtAppPartneerProductRemove` | Removal / failed prolongation webhook. |
+1. **Init** — `POST /landing/init-subscription` (или `/landing/:locale/init-subscription`).  
+   Тело: `productName` (обяз.), `skipConfirm: true` (обяз.), `phoneNum` **или** заголовок `X-MSISDN` / `X-Msisdn` / `X-Phone-Number`.  
+   Вызов: Viva **InitSubscription** (OTP на стороне Viva). Подтверждение без OTP через init **не выполняется**.
 
-CORS is applied to `/landing/*` only; other external POSTs require a valid **X-Signature**.
+2. **Confirm** — `POST /landing/confirm-subscription`.  
+   Тело: `phoneNum` (или MSISDN в заголовке), `productName`, `otp`, **`productCode`** (обяз. для заказа в Armor).  
+   Вызов: Viva **ConfirmSubscription**. При `resultCode == 0` — `order/create` (New). При `resultCode == 7` — ответ 200 без заказа (уже активна).
 
-### 7.2 Viva REST requests mirrored in Postman (folder «0. Viva REST»)
+3. **Subscriber** — `GET /landing/subscriber-info/:phoneNum` или `POST /landing/subscriber-info` → Viva **GetSubscriberInfo**.
 
-The collection duplicates direct calls to Viva for manual testing (after **Get Access Token**):
+Локаль SMS (`order/customData.smsLocale`): сегмент `:locale` в пути (`en`, `ru`, `hy` и алиасы) или поле `locale` в JSON. Логика: `internal/app/locale.go`.
 
-| Spec | Request in collection |
-|------|------------------------|
+### 7.2 Маршруты BFF
+
+| Method | Path | Назначение |
+|--------|------|------------|
+| POST | `/landing/init-subscription` | InitSubscription |
+| POST | `/landing/confirm-subscription` | ConfirmSubscription + order/create |
+| GET | `/landing/subscriber-info/:phoneNum` | GetSubscriberInfo |
+| POST | `/landing/subscriber-info` | GetSubscriberInfo (body / X-MSISDN) |
+| POST | `/landing/:locale/init-subscription` | Init + локаль в пути |
+| POST | `/landing/:locale/confirm-subscription` | Confirm + локаль |
+| GET | `/landing/:locale/subscriber-info/:phoneNum` | Subscriber + локаль |
+| POST | `/landing/:locale/subscriber-info` | Subscriber + локаль |
+| POST | `/ExtAppPartneerProductActivationRequest` | Вебхук New (§6), **X-Signature** |
+| POST | `/ExtAppPartneerProductActivation` | Вебхук Renew |
+| POST | `/ExtAppPartneerProductRemove` | Вебхук Cancel / remove |
+
+На `/landing/*` — CORS, **без** подписи. На вебхуки — **X-Signature** (HMAC-SHA256 hex lower от тела JSON и `extTransport.secret`).
+
+Тело вебхука: `phoneNum`, `productCode`; опционально `locale`, `smsScenario` (для SMS после `order/completed`).
+
+### 7.3 Конфиг и SMS
+
+- `vivaApi` — `baseURL`, `userName`, `password` для `internal/vivaclient`.
+- `smpp` — SMPP и опционально `smsTemplates` (сценарии `sms2`, `sms3`, `sms4`, …); без override — встроенные шаблоны в коде.
+
+### 7.4 Postman — папки коллекции
+
+| Папка | Содержимое |
+|-------|------------|
+| **0. Viva REST** | Прямые вызовы §2–§3.7 (токен, Init/Confirm/Remove в query) |
+| **1. Landing BFF** | Маршруты на `bff_base_url` |
+| **2. Viva → BFF webhooks** | Три POST с auto **X-Signature** (pre-request) |
+
+Порядок проверки лендинга: Init (`skipConfirm: true`) → ввести `otp_code` → Confirm с `productCode`.
+
+### 7.5 Viva REST в Postman (§2–§3)
+
+| Spec | Запрос в коллекции |
+|------|-------------------|
 | §2.1 | POST `/auth/token` |
-| §2.4 | OPTIONS `/auth/token` (*Ping API*) |
+| §2.4 | OPTIONS `/auth/token` |
 | §3.1 | GET `/api/Subscriber/{msisdn}` |
-| §3.2 | POST `/api/Subscriber/AddTariffPlanProduct` with JSON `tpProduct` (**TpProductDTO**, §4.3) |
-| §3.3 | POST chargeable product — PDF lists the same URL as §3.2 (likely typo); Postman uses **`/api/Subscriber/AddChargeableProduct`** with `tpProduct` (**ChargeableProductDTO**, §4.5); adjust URL if your environment differs. |
+| §3.2 | POST `/api/Subscriber/AddTariffPlanProduct` |
+| §3.3 | POST `/api/Subscriber/AddChargeableProduct` |
 | §3.4 | GET `/api/Subscription/GetProductsByPhoneNum?phoneNum=…` |
 | §3.5 | POST `/api/Subscription/InitSubscription?phoneNum=…&productName=…` |
 | §3.6 | POST `/api/Subscription/ConfirmSubscription?…&otp=…` |
-| §3.7 | POST `/api/Subscription/RemoveSubscription?phoneNum=…&productName=…` |
+| §3.7 | POST `/api/Subscription/RemoveSubscription?…` |
 
-Result codes: §5. Subscription workflow narrative: §6.
+Коды результатов: §5. Вебхуки и сценарии подписки: §6.

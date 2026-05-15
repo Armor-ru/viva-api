@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "viva-api BFF — Landing + Viva webhooks",
-    "description": "Тесты **viva-api** (BFF) и прямые вызовы **Viva REST** по спецификации `viva-api/docs/viva.md` (§2–§7).\n\n**Локаль / язык SMS (SMPP):**\n- В **пути** `POST/GET /landing/:locale/...` допустимы алиасы из `internal/app/sms_i18n.go` → в заказ уходит каноническое значение `en` | `ru` | `hy`:\n  - **Английский:** `en`, `eng`, `english`\n  - **Русский:** `ru`, `rus`, `russian`\n  - **Армянский:** `hy`, `arm`, `hye`, `armenian`\n- Иной сегмент в `:locale` → **400** `unknown locale`.\n- Без префикса в пути: в теле JSON необязательное поле **`locale`** (те же алиасы); неизвестное значение **не 400**, а нормализуется в **ru** (`LocaleOrDefault`).\n- Приоритет: **сегмент пути** важнее тела.\n\n**Вариант A:** MSISDN в **`X-MSISDN`** и т.д. **Вариант B:** `phoneNum` + `otp`. **Вебхуки:** `X-Signature`. Поле **`locale`** можно передавать во вебхуке (`ExtReq`) для SMS после `order/completed`.",
+    "description": "viva-api BFF + прямые вызовы Viva REST (`docs/viva.md` §7).\n\n**Лендинг:** Init (`skipConfirm: true`) → Confirm с `otp` и `productCode`. Init вызывает только Viva InitSubscription.\n\n**MSISDN:** заголовки `X-MSISDN` / `X-Msisdn` / `X-Phone-Number` или поле `phoneNum`.\n\n**Локаль SMS:** путь `/landing/:locale/...` (en|ru|hy и алиасы, см. `internal/app/locale.go`) или поле `locale` в JSON.\n\n**Вебхуки:** `X-Signature` = HMAC-SHA256 hex от тела JSON + `webhook_secret`.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -66,7 +66,7 @@
     {
       "key": "webhook_product_code",
       "value": "923e0af7-8c92-4078-b9e5-0894d4efc4f8",
-      "description": "productCode в JSON вебхуков (как в order/create)"
+      "description": "productCode для вебхуков и Confirm (externalId в order/create)"
     },
     {
       "key": "viva_sub_no",
@@ -325,7 +325,7 @@
     },
     {
       "name": "1. Landing BFF (ваш viva-api)",
-      "description": "`POST /landing/*` на `bff_base_url`. **Локаль SMS:** см. переменную `landing_locale` и папку **«1b. Локаль (:locale)»**. Без пути язык можно задать полем **`locale`** в JSON (для маршрутов без `:locale` пустой/неизвестный → **ru**). Токен не нужен. **A** — MSISDN в заголовке/теле; **B** — OTP на confirm.",
+      "description": "BFF на `bff_base_url`. Без Bearer. Init: `skipConfirm: true`, `productName`. Confirm: `otp`, `productCode`. Папка 1b — маршруты с `:locale`.",
       "item": [
         {
           "name": "A — Header Enrichment (X-MSISDN, без phoneNum в JSON)",
@@ -355,7 +355,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"productName\": \"{{product_name}}\",\n  \"skipConfirm\": false\n}",
+              "raw": "{\n  \"productName\": \"{{product_name}}\",\n  \"skipConfirm\": true\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -363,7 +363,7 @@
               }
             },
             "url": "{{bff_base_url}}/landing/init-subscription",
-            "description": "Как в спеке: Viva кладёт MSISDN в заголовок; лендинг шлёт только продукт и флаги. Локально в Postman имитируете заголовок сами."
+            "description": "MSISDN в X-MSISDN. Обязательно skipConfirm: true. Далее Confirm с otp и productCode."
           },
           "response": []
         },
@@ -467,7 +467,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"phoneNum\": \"{{msisdn}}\",\n  \"productName\": \"{{product_name}}\",\n  \"otp\": \"{{otp_code}}\"\n}",
+              "raw": "{\n  \"phoneNum\": \"{{msisdn}}\",\n  \"productName\": \"{{product_name}}\",\n  \"otp\": \"{{otp_code}}\",\n  \"productCode\": \"{{webhook_product_code}}\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -475,7 +475,7 @@
               }
             },
             "url": "{{bff_base_url}}/landing/confirm-subscription",
-            "description": "Поле JSON: `otp`. Опционально добавьте `\"locale\": \"hy\"` — язык SMS после order/completed (если путь без :locale)."
+            "description": "otp и productCode обязательны при resultCode 0. Опционально locale в JSON."
           },
           "response": []
         },
@@ -519,7 +519,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"phoneNum\": \"{{msisdn}}\",\n  \"productName\": \"{{product_name}}\",\n  \"otp\": \"{{otp_code}}\"\n}",
+                  "raw": "{\n  \"phoneNum\": \"{{msisdn}}\",\n  \"productName\": \"{{product_name}}\",\n  \"otp\": \"{{otp_code}}\",\n  \"productCode\": \"{{webhook_product_code}}\"\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -527,7 +527,7 @@
                   }
                 },
                 "url": "{{bff_base_url}}/landing/{{landing_locale}}/confirm-subscription",
-                "description": "Локаль в пути задаёт язык SMPP после успешного заказа."
+                "description": "Локаль в пути → smsLocale в order/customData."
               },
               "response": []
             },
@@ -657,7 +657,8 @@
                 }
               }
             },
-            "url": "{{bff_base_url}}/ExtAppPartneerProductActivationRequest"
+            "url": "{{bff_base_url}}/ExtAppPartneerProductActivationRequest",
+            "description": "New subscription. Опционально: locale, smsScenario в JSON."
           },
           "response": []
         },
@@ -685,7 +686,8 @@
                 }
               }
             },
-            "url": "{{bff_base_url}}/ExtAppPartneerProductActivation"
+            "url": "{{bff_base_url}}/ExtAppPartneerProductActivation",
+            "description": "Renew / prolongation."
           },
           "response": []
         },
@@ -713,7 +715,8 @@
                 }
               }
             },
-            "url": "{{bff_base_url}}/ExtAppPartneerProductRemove"
+            "url": "{{bff_base_url}}/ExtAppPartneerProductRemove",
+            "description": "Cancel / remove. smsScenario: sms14 для SMS «нет средств»."
           },
           "response": []
         }
