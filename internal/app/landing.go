@@ -1,4 +1,4 @@
-package handlers
+package viva_api
 
 import (
 	"context"
@@ -6,14 +6,10 @@ import (
 	"strings"
 	"time"
 
-	viva_api "github.com/Armor-ru/viva-api/internal/app"
-	"github.com/Armor-ru/viva-api/internal/app/service"
-	"github.com/Armor-ru/viva-api/internal/app/utils"
-	"github.com/Armor-ru/viva-api/internal/vivaclient"
-
 	"github.com/Armor-ru/sds-go/pkg/logger"
 	httpt "github.com/Armor-ru/sds-go/pkg/transport/http"
 	"github.com/Armor-ru/sds-go/pkg/types"
+	"github.com/Armor-ru/viva-api/internal/vivaclient"
 )
 
 const requestTimeout = 25 * time.Second
@@ -47,63 +43,30 @@ type landingSubscriberInfoBody struct {
 	Locale   string `json:"locale,omitempty"`
 }
 
-func landingInitSubscriptionHandler(v *viva_api.Viva) func(types.HandlerContext) {
-	return func(ctx types.HandlerContext) {
-		handleInit(v, ctx, "")
-	}
+func (s *Viva) landingInit(ctx types.HandlerContext)          { s.handleInit(ctx, "") }
+func (s *Viva) landingInitLocalized(ctx types.HandlerContext) { s.handleInit(ctx, ctx.Param("locale")) }
+func (s *Viva) landingConfirm(ctx types.HandlerContext)       { s.handleConfirm(ctx, "") }
+func (s *Viva) landingConfirmLocalized(ctx types.HandlerContext) {
+	s.handleConfirm(ctx, ctx.Param("locale"))
+}
+func (s *Viva) landingSubscriberGET(ctx types.HandlerContext) { s.handleSubscriberGET(ctx, "") }
+func (s *Viva) landingSubscriberGETLocalized(ctx types.HandlerContext) {
+	s.handleSubscriberGET(ctx, ctx.Param("locale"))
+}
+func (s *Viva) landingSubscriberPOST(ctx types.HandlerContext) { s.handleSubscriberPOST(ctx, "") }
+func (s *Viva) landingSubscriberPOSTLocalized(ctx types.HandlerContext) {
+	s.handleSubscriberPOST(ctx, ctx.Param("locale"))
 }
 
-func landingInitSubscriptionLocalizedHandler(v *viva_api.Viva) func(types.HandlerContext) {
-	return func(ctx types.HandlerContext) {
-		handleInit(v, ctx, ctx.Param("locale"))
-	}
-}
-
-func landingConfirmSubscriptionHandler(v *viva_api.Viva) func(types.HandlerContext) {
-	return func(ctx types.HandlerContext) {
-		handleConfirm(v, ctx, "")
-	}
-}
-
-func landingConfirmSubscriptionLocalizedHandler(v *viva_api.Viva) func(types.HandlerContext) {
-	return func(ctx types.HandlerContext) {
-		handleConfirm(v, ctx, ctx.Param("locale"))
-	}
-}
-
-func landingGetSubscriberInfoGETHandler(v *viva_api.Viva) func(types.HandlerContext) {
-	return func(ctx types.HandlerContext) {
-		handleSubscriberGET(v, ctx, "")
-	}
-}
-
-func landingGetSubscriberInfoGETLocalizedHandler(v *viva_api.Viva) func(types.HandlerContext) {
-	return func(ctx types.HandlerContext) {
-		handleSubscriberGET(v, ctx, ctx.Param("locale"))
-	}
-}
-
-func landingGetSubscriberInfoPOSTHandler(v *viva_api.Viva) func(types.HandlerContext) {
-	return func(ctx types.HandlerContext) {
-		handleSubscriberPOST(v, ctx, "")
-	}
-}
-
-func landingGetSubscriberInfoPOSTLocalizedHandler(v *viva_api.Viva) func(types.HandlerContext) {
-	return func(ctx types.HandlerContext) {
-		handleSubscriberPOST(v, ctx, ctx.Param("locale"))
-	}
-}
-
-func handleInit(v *viva_api.Viva, ctx types.HandlerContext, pathLocale string) {
-	if !ensurePartner(v, ctx) {
+func (s *Viva) handleInit(ctx types.HandlerContext, pathLocale string) {
+	if !s.ensurePartner(ctx) {
 		return
 	}
 
 	var body landingInitBody
 	ctx.Data(&body)
 
-	locale, err := utils.LandingPickLocale(pathLocale, body.Locale)
+	locale, err := landingPickLocale(pathLocale, body.Locale)
 	if err != nil {
 		respondError(ctx, 400, err.Error())
 		return
@@ -115,15 +78,12 @@ func handleInit(v *viva_api.Viva, ctx types.HandlerContext, pathLocale string) {
 		return
 	}
 
-	phone, fromHeader, err := extractMSISDN(ctx, body.PhoneNum)
+	phone, _, err := extractMSISDN(ctx, body.PhoneNum)
 	if err != nil {
 		respondError(ctx, 400, err.Error())
 		return
 	}
 
-	// Security hardening: do not allow OTP-less confirmation via Header Enrichment.
-	// Always require explicit OTP confirmation via /landing/confirm-subscription.
-	_ = fromHeader
 	if !body.SkipConfirm {
 		respondError(ctx, 400, "skipConfirm must be true; confirm requires OTP")
 		return
@@ -132,7 +92,7 @@ func handleInit(v *viva_api.Viva, ctx types.HandlerContext, pathLocale string) {
 	c, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 
-	initRes, err := v.VivaPartner.InitSubscription(c, phone, product)
+	initRes, err := s.vivaPartner.InitSubscription(c, phone, product)
 	if err != nil {
 		logger.Error().Err(err).Str("phone", phone).Msg("Viva InitSubscription")
 		respondError(ctx, 502, err.Error())
@@ -142,15 +102,15 @@ func handleInit(v *viva_api.Viva, ctx types.HandlerContext, pathLocale string) {
 	respondOK(ctx, map[string]interface{}{"init": initRes, "locale": locale})
 }
 
-func handleConfirm(v *viva_api.Viva, ctx types.HandlerContext, pathLocale string) {
-	if !ensurePartner(v, ctx) {
+func (s *Viva) handleConfirm(ctx types.HandlerContext, pathLocale string) {
+	if !s.ensurePartner(ctx) {
 		return
 	}
 
 	var body landingConfirmBody
 	ctx.Data(&body)
 
-	locale, err := utils.LandingPickLocale(pathLocale, body.Locale)
+	locale, err := landingPickLocale(pathLocale, body.Locale)
 	if err != nil {
 		respondError(ctx, 400, err.Error())
 		return
@@ -177,7 +137,7 @@ func handleConfirm(v *viva_api.Viva, ctx types.HandlerContext, pathLocale string
 	c, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 
-	res, err := v.VivaPartner.ConfirmSubscription(c, phone, product, &otp)
+	res, err := s.vivaPartner.ConfirmSubscription(c, phone, product, &otp)
 	if err != nil {
 		logger.Error().Err(err).Str("phone", phone).Msg("Viva ConfirmSubscription (OTP)")
 		respondError(ctx, 502, err.Error())
@@ -199,17 +159,16 @@ func handleConfirm(v *viva_api.Viva, ctx types.HandlerContext, pathLocale string
 		respondError(ctx, 400, "productCode required")
 		return
 	}
-	service.SendOrderCreate(v, types.OrderTypeNew, phone, productCode, body.SmsScenario, locale)
+	s.sendOrderCreate(types.OrderTypeNew, phone, productCode, body.SmsScenario, locale)
 	respondOK(ctx, map[string]interface{}{"confirm": res, "locale": locale})
 }
 
-func handleSubscriberGET(v *viva_api.Viva, ctx types.HandlerContext, pathLocale string) {
-	if _, err := utils.LandingPickLocale(pathLocale, ""); err != nil {
+func (s *Viva) handleSubscriberGET(ctx types.HandlerContext, pathLocale string) {
+	if _, err := landingPickLocale(pathLocale, ""); err != nil {
 		respondError(ctx, 400, err.Error())
 		return
 	}
-
-	if !ensurePartner(v, ctx) {
+	if !s.ensurePartner(ctx) {
 		return
 	}
 
@@ -218,19 +177,18 @@ func handleSubscriberGET(v *viva_api.Viva, ctx types.HandlerContext, pathLocale 
 		respondError(ctx, 400, "phoneNum required")
 		return
 	}
-
-	fetchSubscriberInfo(ctx, v.VivaPartner, phone)
+	s.fetchSubscriberInfo(ctx, phone)
 }
 
-func handleSubscriberPOST(v *viva_api.Viva, ctx types.HandlerContext, pathLocale string) {
-	if !ensurePartner(v, ctx) {
+func (s *Viva) handleSubscriberPOST(ctx types.HandlerContext, pathLocale string) {
+	if !s.ensurePartner(ctx) {
 		return
 	}
 
 	var body landingSubscriberInfoBody
 	ctx.Data(&body)
 
-	if _, err := utils.LandingPickLocale(pathLocale, body.Locale); err != nil {
+	if _, err := landingPickLocale(pathLocale, body.Locale); err != nil {
 		respondError(ctx, 400, err.Error())
 		return
 	}
@@ -240,15 +198,14 @@ func handleSubscriberPOST(v *viva_api.Viva, ctx types.HandlerContext, pathLocale
 		respondError(ctx, 400, err.Error())
 		return
 	}
-
-	fetchSubscriberInfo(ctx, v.VivaPartner, phone)
+	s.fetchSubscriberInfo(ctx, phone)
 }
 
-func fetchSubscriberInfo(ctx types.HandlerContext, client viva_api.PartnerSubscriptionAPI, phone string) {
+func (s *Viva) fetchSubscriberInfo(ctx types.HandlerContext, phone string) {
 	c, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 
-	info, err := client.GetSubscriberInfo(c, phone)
+	info, err := s.vivaPartner.GetSubscriberInfo(c, phone)
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "not found") {
 			respondError(ctx, 404, err.Error())
@@ -258,12 +215,11 @@ func fetchSubscriberInfo(ctx types.HandlerContext, client viva_api.PartnerSubscr
 		respondError(ctx, 502, err.Error())
 		return
 	}
-
 	respondOK(ctx, info)
 }
 
-func ensurePartner(v *viva_api.Viva, ctx types.HandlerContext) bool {
-	if v.VivaPartner == nil {
+func (s *Viva) ensurePartner(ctx types.HandlerContext) bool {
+	if s.vivaPartner == nil {
 		respondError(ctx, 503, "viva api not configured")
 		return false
 	}
@@ -289,7 +245,6 @@ func extractMSISDN(ctx types.HandlerContext, bodyPhone string) (string, bool, er
 	if p := cleanMSISDN(bodyPhone); p != "" {
 		return p, false, nil
 	}
-
 	return "", false, fmt.Errorf("phoneNum missing: provide in body or via MSISDN header")
 }
 
