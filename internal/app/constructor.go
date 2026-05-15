@@ -1,17 +1,9 @@
 package viva_api
 
 import (
-	"context"
-
 	"github.com/Armor-ru/sds-go/pkg/types"
 	"github.com/Armor-ru/viva-api/internal/vivaclient"
 )
-
-type PartnerSubscriptionAPI interface {
-	GetSubscriberInfo(ctx context.Context, msisdn string) (*vivaclient.GetSubInfoResponse, error)
-	InitSubscription(ctx context.Context, phoneNum, productName string) (*vivaclient.ResponseModel, error)
-	ConfirmSubscription(ctx context.Context, phoneNum, productName string, otp *string) (*vivaclient.ResponseModel, error)
-}
 
 func New(options ...func(*Viva)) Viva {
 	instance := Viva{}
@@ -52,8 +44,8 @@ func WithAccountId(accountId string) func(*Viva) {
 	}
 }
 
-func WithVivaPartner(api PartnerSubscriptionAPI) func(*Viva) {
+func WithVivaClient(c *vivaclient.Client) func(*Viva) {
 	return func(s *Viva) {
-		s.vivaPartner = api
+		s.vivaClient = c
 	}
 }
