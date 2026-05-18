@@ -130,14 +130,11 @@ func (tm *tokenManager) fetch(ctx context.Context, client *http.Client, baseURL 
 
 func (tr TokenResponse) expiryDuration() time.Duration {
 	if tr.ExpiresIn <= 0 {
-		return time.Hour // дефолтное значение
+		return time.Hour
 	}
 	return time.Duration(tr.ExpiresIn) * time.Second
 }
 
-// --- HTTP-методы клиента ---
-
-// do выполняет HTTP-запрос с авторизацией и парсингом ответа
 func (c *Client) do(ctx context.Context, method, path string, body io.Reader, out interface{}) error {
 	token, err := c.auth.get(ctx, c.http, c.baseURL)
 	if err != nil {

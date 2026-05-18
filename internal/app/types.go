@@ -26,16 +26,6 @@ type ExtReq struct {
 	Locale      string `json:"locale,omitempty"`
 }
 
-type SmsData struct {
-	ProductName    string
-	ProductLabel   string
-	Quantity       int
-	ActivationCode string
-	LicenseKey     string
-	DownloadURL    string
-	TrialEndDate   string
-}
-
 const (
 	cdVivaWebhook = "vivaWebhook"
 	cdSmsScenario = "smsScenario"

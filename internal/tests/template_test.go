@@ -6,8 +6,6 @@ import (
 	"text/template"
 
 	"github.com/Armor-ru/sds-go/pkg/tplext"
-
-	viva_api "github.com/Armor-ru/viva-api/internal/app"
 )
 
 func TestSmsTemplatePluralize(t *testing.T) {
@@ -22,7 +20,12 @@ func TestSmsTemplatePluralize(t *testing.T) {
 	}
 
 	var b bytes.Buffer
-	err = tpl.Execute(&b, viva_api.SmsData{
+	err = tpl.Execute(&b, struct {
+		ProductName    string
+		Quantity       int
+		ActivationCode string
+		DownloadURL    string
+	}{
 		ProductName:    "SafeKids",
 		Quantity:       22,
 		ActivationCode: "ABC",

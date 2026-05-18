@@ -1,6 +1,7 @@
 package viva_api
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -32,7 +33,6 @@ func (s *Viva) InitHandlers() {
 
 	if s.extTransport != nil {
 		s.initMiddleWare()
-		// ExtAppPartneerProductActivationRequest stay for test because have method "init" which make same things
 		s.extTransport.Subscribe("POST /ExtAppPartneerProductActivationRequest", s.ExtAppPartnerProductActivationRequestHandler)
 		s.extTransport.Subscribe("POST /ExtAppPartneerProductActivation", s.ExtAppPartnerProductActivationHandler)
 		s.extTransport.Subscribe("POST /ExtAppPartneerProductRemove", s.ExtAppPartnerProductRemoveHandler)
@@ -72,21 +72,23 @@ func (s *Viva) initMiddleWare() {
 }
 
 func (s *Viva) ExtAppPartnerProductActivationRequestHandler(ctx types.HandlerContext) {
-	s.handleExtWebhook(ctx, types.OrderTypeNew)
+	data := ExtReq{}
+	ctx.Data(&data)
+	s.sendOrderCreate(types.OrderTypeNew, data.PhoneNum, data.ProductCode, data.SmsScenario, data.Locale)
+	_ = ctx.Response("")
 }
 
 func (s *Viva) ExtAppPartnerProductActivationHandler(ctx types.HandlerContext) {
-	s.handleExtWebhook(ctx, types.OrderTypeRenew)
+	data := ExtReq{}
+	ctx.Data(&data)
+	s.sendOrderCreate(types.OrderTypeRenew, data.PhoneNum, data.ProductCode, data.SmsScenario, data.Locale)
+	_ = ctx.Response("")
 }
 
 func (s *Viva) ExtAppPartnerProductRemoveHandler(ctx types.HandlerContext) {
-	s.handleExtWebhook(ctx, types.OrderTypeCancel)
-}
-
-func (s *Viva) handleExtWebhook(ctx types.HandlerContext, orderType types.OrderType) {
 	data := ExtReq{}
 	ctx.Data(&data)
-	s.sendOrderCreate(orderType, data.PhoneNum, data.ProductCode, data.SmsScenario, data.Locale)
+	s.sendOrderCreate(types.OrderTypeCancel, data.PhoneNum, data.ProductCode, data.SmsScenario, data.Locale)
 	_ = ctx.Response("")
 }
 
@@ -158,9 +160,13 @@ func (s *Viva) onCompletedHandler(ctx types.HandlerContext) {
 		return
 	}
 
-	phone := orderPhone(order)
-	if phone == "" {
+	rawPhone, ok := order.Fields["phone"]
+	if !ok {
 		logger.Error().Str("orderId", order.ID).Msg("can not send notify, order has no phone")
+		return
+	}
+	phone := strings.TrimSpace(cast.ToString(rawPhone))
+	if phone == "" {
 		return
 	}
 
@@ -168,118 +174,99 @@ func (s *Viva) onCompletedHandler(ctx types.HandlerContext) {
 	scenario := strings.TrimSpace(cast.ToString(order.CustomData[cdSmsScenario]))
 	locale := localeOrDefault(cast.ToString(order.CustomData[cdSmsLocale]))
 
-	switch wh {
-	case whActivation:
-		sc := "sms4"
-		if scenario == "sms5" || scenario == "sms15" || scenario == "sms4" {
-			sc = scenario
-		}
-		s.sendScenarioSMS(order, phone, locale, sc)
-	case whRemove:
-		sc := "sms_deactivated"
-		if scenario == "sms14" {
-			sc = "sms14"
-		}
-		s.sendScenarioSMS(order, phone, locale, sc)
-	default:
-		s.sendActivationSMS(order, phone, locale)
+	label := ""
+	if len(order.Items) > 0 {
+		label = cast.ToString(order.Items[0].Product.Name)
 	}
-}
-
-func orderPhone(order types.OrderResponse) string {
-	raw, ok := order.Fields["phone"]
-	if !ok {
-		return ""
-	}
-	return strings.TrimSpace(cast.ToString(raw))
-}
-
-func (s *Viva) sendActivationSMS(order types.OrderResponse, phone, locale string) {
-	if len(order.Items) == 0 {
-		return
-	}
-	ok := false
-	for _, it := range order.Items {
-		if it.Type == "activate" || it.Type == "reactivate" {
-			ok = true
-			break
-		}
-	}
-	if !ok {
-		logger.Info().Str("orderId", order.ID).Msg("no need to send notify with activation code")
-		return
-	}
-
-	item := order.Items[0]
-	code := strings.TrimSpace(cast.ToString(item.Artifacts["ActivationCode"]))
-	if code == "" {
-		logger.Error().Str("orderId", order.ID).Msg("can not send notify, ActivationCode is empty")
-		return
-	}
-
-	rawDownload, _ := item.Artifacts["download"].([]interface{})
-	downloads := make([]map[string]interface{}, 0)
-	for _, v := range rawDownload {
-		if m, ok := v.(map[string]interface{}); ok {
-			downloads = append(downloads, m)
-		}
-	}
-	if len(downloads) == 0 {
-		logger.Error().Str("orderId", order.ID).Msg("can not send notify, artifacts download not found")
-		return
-	}
-	url := strings.TrimSpace(cast.ToString(downloads[0]["url"]))
-	if url == "" {
-		logger.Error().Str("orderId", order.ID).Msg("can not send notify, DownloadURL is empty")
-		return
-	}
-
-	label := cast.ToString(item.Product.Name)
-	d := SmsData{ProductLabel: label, ActivationCode: code, LicenseKey: code, DownloadURL: url}
-	if !s.sendScenarioSMS(order, phone, locale, "sms2", d) {
-		return
-	}
-	s.sendScenarioSMS(order, phone, locale, "sms3", d)
-}
-
-func (s *Viva) sendScenarioSMS(order types.OrderResponse, phone, locale, scenario string, data ...SmsData) bool {
-	d := SmsData{ProductLabel: productLabel(order)}
+	trialEnd := ""
 	if order.EndTime != nil {
-		d.TrialEndDate = order.EndTime.Format("02.01.2006")
-	}
-	if len(data) > 0 {
-		d = data[0]
-		if d.ProductLabel == "" {
-			d.ProductLabel = productLabel(order)
-		}
+		trialEnd = order.EndTime.Format("02.01.2006")
 	}
 
-	body := smsText(scenario, locale, d)
-	if body == "" {
+	send := func(scenario string, args ...interface{}) bool {
+		body := fmt.Sprintf(GetTemplate(scenario, locale), args...)
+		if body == "" {
+			return true
+		}
+		if err := s.smppSender.Send(phone, body); err != nil {
+			smppErr, ok := err.(*SmppError)
+			log := logger.Error().Str("orderId", order.ID)
+			if ok {
+				for k, v := range smppErr.Fields {
+					log = log.Interface(k, v)
+				}
+			}
+			log.Msg("send smpp notify failed, " + err.Error())
+			return false
+		}
+		logger.Info().Str("orderId", order.ID).Str("scenario", scenario).Str("phone", phone).Msg("SMS sent")
 		return true
 	}
-	if err := s.smppSender.Send(phone, body); err != nil {
-		logSmppErr(order.ID, err)
-		return false
-	}
-	logger.Info().Str("orderId", order.ID).Str("scenario", scenario).Str("phone", phone).Msg("SMS sent")
-	return true
-}
 
-func productLabel(order types.OrderResponse) string {
-	if len(order.Items) == 0 {
-		return ""
-	}
-	return cast.ToString(order.Items[0].Product.Name)
-}
-
-func logSmppErr(orderID string, err error) {
-	smppErr, ok := err.(*SmppError)
-	log := logger.Error().Str("orderId", orderID)
-	if ok {
-		for k, v := range smppErr.Fields {
-			log = log.Interface(k, v)
+	switch wh {
+	case whActivation:
+		switch scenario {
+		case "sms5":
+			if trialEnd != "" {
+				send("sms5_with_date", label, trialEnd)
+			} else {
+				send("sms5_soon", label)
+			}
+		case "sms15":
+			send("sms15")
+		default:
+			send("sms4", label)
 		}
+	case whRemove:
+		if scenario == "sms14" {
+			send("sms14")
+		} else {
+			send("sms_deactivated", label)
+		}
+	default:
+		if len(order.Items) == 0 {
+			return
+		}
+		hasActivation := false
+		for _, it := range order.Items {
+			if it.Type == "activate" || it.Type == "reactivate" {
+				hasActivation = true
+				break
+			}
+		}
+		if !hasActivation {
+			logger.Info().Str("orderId", order.ID).Msg("no need to send notify with activation code")
+			return
+		}
+
+		item := order.Items[0]
+		code := strings.TrimSpace(cast.ToString(item.Artifacts["ActivationCode"]))
+		if code == "" {
+			logger.Error().Str("orderId", order.ID).Msg("can not send notify, ActivationCode is empty")
+			return
+		}
+
+		rawDownload, _ := item.Artifacts["download"].([]interface{})
+		downloads := make([]map[string]interface{}, 0)
+		for _, v := range rawDownload {
+			if m, ok := v.(map[string]interface{}); ok {
+				downloads = append(downloads, m)
+			}
+		}
+		if len(downloads) == 0 {
+			logger.Error().Str("orderId", order.ID).Msg("can not send notify, artifacts download not found")
+			return
+		}
+		url := strings.TrimSpace(cast.ToString(downloads[0]["url"]))
+		if url == "" {
+			logger.Error().Str("orderId", order.ID).Msg("can not send notify, DownloadURL is empty")
+			return
+		}
+
+		product := cast.ToString(item.Product.Name)
+		if !send("sms2", product) {
+			return
+		}
+		send("sms3", product, code, url)
 	}
-	log.Msg("send smpp notify failed, " + err.Error())
 }
