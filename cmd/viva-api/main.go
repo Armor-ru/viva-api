@@ -11,8 +11,6 @@ import (
 	"github.com/Armor-ru/sds-go/pkg/transport"
 
 	viva_api "github.com/Armor-ru/viva-api/internal/app"
-	"github.com/Armor-ru/viva-api/internal/app/handlers"
-	"github.com/Armor-ru/viva-api/internal/app/utils"
 	"github.com/Armor-ru/viva-api/internal/vivaclient"
 )
 
@@ -26,10 +24,8 @@ type Conf struct {
 		Secret []string `yaml:"secret"`
 	} `yaml:"extTransport"`
 
-	SMPP        utils.SmppConfig  `yaml:"smpp"`
-	TestTariffs []string          `yaml:"testTariffs"`
-	Channels    viva_api.Channels `yaml:"channels"`
-	AccountId   string            `yaml:"accountId"`
+	SMPP      viva_api.SmppConfig `yaml:"smpp"`
+	AccountId string              `yaml:"accountId"`
 
 	VivaAPI struct {
 		BaseURL  string `yaml:"baseURL"`
@@ -70,24 +66,23 @@ func main() {
 	defer http.Disconnect()
 	http.Connect()
 
-	var partner viva_api.PartnerSubscriptionAPI
+	var client *vivaclient.Client
 	if strings.TrimSpace(cfg.VivaAPI.BaseURL) != "" {
-		partner = vivaclient.New(vivaclient.Config{
+		client = vivaclient.New(vivaclient.Config{
 			BaseURL:  strings.TrimSpace(cfg.VivaAPI.BaseURL),
 			UserName: strings.TrimSpace(cfg.VivaAPI.UserName),
 			Password: strings.TrimSpace(cfg.VivaAPI.Password),
 		})
 	}
 
-	v := viva_api.New(
+	viva_api.New(
 		viva_api.WithIntTransport(nats),
 		viva_api.WithExtTransport(http),
 		viva_api.WithSecrets(cfg.ExtTransport.Secret),
 		viva_api.WithSmppConfig(cfg.SMPP),
 		viva_api.WithAccountId(cfg.AccountId),
-		viva_api.WithVivaPartner(partner),
+		viva_api.WithVivaClient(client),
 	)
-	handlers.Register(&v)
 
 	nats.ConnectAndWait()
 }

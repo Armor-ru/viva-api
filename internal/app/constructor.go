@@ -2,7 +2,7 @@ package viva_api
 
 import (
 	"github.com/Armor-ru/sds-go/pkg/types"
-	"github.com/Armor-ru/viva-api/internal/app/utils"
+	"github.com/Armor-ru/viva-api/internal/vivaclient"
 )
 
 func New(options ...func(*Viva)) Viva {
@@ -10,42 +10,42 @@ func New(options ...func(*Viva)) Viva {
 	for _, option := range options {
 		option(&instance)
 	}
-	instance.InitSMSInfrastructure()
+	instance.InitHandlers()
 	return instance
 }
 
 func WithIntTransport(transport types.Transport) func(*Viva) {
 	return func(s *Viva) {
-		s.IntTransport = transport
+		s.intTransport = transport
 	}
 }
 
 func WithExtTransport(transport types.Transport) func(*Viva) {
 	return func(s *Viva) {
-		s.ExtTransport = transport
+		s.extTransport = transport
 	}
 }
 
 func WithSecrets(secrets []string) func(*Viva) {
 	return func(s *Viva) {
-		s.Secrets = secrets
+		s.secrets = secrets
 	}
 }
 
-func WithSmppConfig(config utils.SmppConfig) func(*Viva) {
+func WithSmppConfig(config SmppConfig) func(*Viva) {
 	return func(s *Viva) {
-		s.Smpp = config
+		s.smpp = config
 	}
 }
 
-func WithAccountId(id string) func(*Viva) {
+func WithAccountId(accountId string) func(*Viva) {
 	return func(s *Viva) {
-		s.AccountId = id
+		s.accountId = accountId
 	}
 }
 
-func WithVivaPartner(api PartnerSubscriptionAPI) func(*Viva) {
+func WithVivaClient(c *vivaclient.Client) func(*Viva) {
 	return func(s *Viva) {
-		s.VivaPartner = api
+		s.vivaClient = c
 	}
 }
