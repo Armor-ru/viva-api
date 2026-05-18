@@ -38,6 +38,12 @@ func WithSmppConfig(config SmppConfig) func(*Viva) {
 	}
 }
 
+func WithSMSTemplates(templates map[string]map[string]string) func(*Viva) {
+	return func(s *Viva) {
+		s.sms = mustSMSTemplates(templates)
+	}
+}
+
 func WithAccountId(accountId string) func(*Viva) {
 	return func(s *Viva) {
 		s.accountId = accountId

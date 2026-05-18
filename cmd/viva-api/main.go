@@ -24,8 +24,9 @@ type Conf struct {
 		Secret []string `yaml:"secret"`
 	} `yaml:"extTransport"`
 
-	SMPP      viva_api.SmppConfig `yaml:"smpp"`
-	AccountId string              `yaml:"accountId"`
+	SMPP         viva_api.SmppConfig          `yaml:"smpp"`
+	SMSTemplates map[string]map[string]string `yaml:"smsTemplates"`
+	AccountId    string                       `yaml:"accountId"`
 
 	VivaAPI struct {
 		BaseURL  string `yaml:"baseURL"`
@@ -80,6 +81,7 @@ func main() {
 		viva_api.WithExtTransport(http),
 		viva_api.WithSecrets(cfg.ExtTransport.Secret),
 		viva_api.WithSmppConfig(cfg.SMPP),
+		viva_api.WithSMSTemplates(cfg.SMSTemplates),
 		viva_api.WithAccountId(cfg.AccountId),
 		viva_api.WithVivaClient(client),
 	)

@@ -13,10 +13,36 @@ smpp:
   auth:
     user: SafeKids
     password: pass123
-  template: |-
-    {{.ProductName}}{{ if .Quantity }} for {{ pluralizeEn .Quantity "device" "devices" }}{{ end }}
-    Activation code: {{.ActivationCode}}
-    Download link: {{.DownloadURL}}
+
+smsTemplates:
+  sms2:
+    en: "Congratulations! {{.ProductLabel}} is active. 2-day trial, then 50 AMD/day."
+    ru: "Поздравляем! Подписка {{.ProductLabel}} активна. Пробный период 2 дня. Далее 50 AMD/день."
+    hy: "Շնորհավորում ենք: {{.ProductLabel}} ակտիվ է: 2 օր փորձ, այնուհետև 50 դրամ/օր:"
+  sms3:
+    en: '"{{.ProductLabel}}": {{.LicenseKey}}. Link: {{.DownloadURL}}'
+    ru: '"{{.ProductLabel}}": {{.LicenseKey}}. Ссылка: {{.DownloadURL}}'
+    hy: '"{{.ProductLabel}}": {{.LicenseKey}}. Հղում: {{.DownloadURL}}'
+  sms4:
+    en: "Chargeable {{.ProductLabel}} is active. 50 AMD/day."
+    ru: "Платная версия {{.ProductLabel}} подключена. Цена 50 AMD/день."
+    hy: "{{.ProductLabel}} վճարովի տարբերակը միացված է: 50 դրամ/օր:"
+  sms5:
+    en: '{{if .TrialEndDate}}{{.ProductLabel}} trial ends {{.TrialEndDate}}. Paid plan will renew if balance is OK.{{else}}{{.ProductLabel}} trial ends soon.{{end}}'
+    ru: '{{if .TrialEndDate}}Пробный период {{.ProductLabel}} истекает {{.TrialEndDate}}. Пополните счёт вовремя.{{else}}Пробный период {{.ProductLabel}} скоро закончится.{{end}}'
+    hy: '{{if .TrialEndDate}}{{.ProductLabel}} փորձնական շրջանը ավարտվում է {{.TrialEndDate}}:{{else}}{{.ProductLabel}} փորձնական շրջանը շուտով ավարտվում է:{{end}}'
+  sms14:
+    en: "Top up via *221# or https://viva.am to continue {{.ProductLabel}}."
+    ru: "Пополните счёт через *221# или https://viva.am для продолжения {{.ProductLabel}}."
+    hy: "Լիցքավորեք հաշիվը *221# կամ https://viva.am {{.ProductLabel}}-ի համար:"
+  sms15:
+    en: "Long time no see. Top up your balance to continue {{.ProductLabel}}."
+    ru: "Давно не встречались. Пополните баланс для продолжения {{.ProductLabel}}."
+    hy: "Վաղուց չենք հանդիպել: Լիցքավորեք հաշիվը՝ շարունակելու {{.ProductLabel}}:"
+  sms_deactivated:
+    en: "{{.ProductLabel}} service deactivated."
+    ru: "Услуга {{.ProductLabel}} деактивирована."
+    hy: "{{.ProductLabel}} ծառայությունն ապաակտիվացված է:"
 
 accountId: 923e0af7-8c92-4078-b9e5-0894d4efc4f8
 

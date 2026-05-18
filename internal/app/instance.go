@@ -1,7 +1,6 @@
 package viva_api
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
@@ -25,10 +24,14 @@ type Viva struct {
 	accountId  string
 	vivaClient *vivaclient.Client
 
+	sms        *smsTemplates
 	smppSender *SmppSender
 }
 
 func (s *Viva) InitHandlers() {
+	if s.sms == nil {
+		panic("sms templates not configured")
+	}
 	s.smppSender = NewSmppSender(s.smpp)
 
 	if s.extTransport != nil {
@@ -183,9 +186,13 @@ func (s *Viva) onCompletedHandler(ctx types.HandlerContext) {
 		trialEnd = order.EndTime.Format("02.01.2006")
 	}
 
-	send := func(scenario string, args ...interface{}) bool {
-		body := fmt.Sprintf(GetTemplate(scenario, locale), args...)
+	send := func(scenario string, data SmsData) bool {
+		if data.ProductLabel == "" {
+			data.ProductLabel = label
+		}
+		body := s.sms.render(scenario, locale, data)
 		if body == "" {
+			logger.Warn().Str("orderId", order.ID).Str("scenario", scenario).Str("locale", locale).Msg("SMS template not rendered")
 			return true
 		}
 		if err := s.smppSender.Send(phone, body); err != nil {
@@ -207,21 +214,17 @@ func (s *Viva) onCompletedHandler(ctx types.HandlerContext) {
 	case whActivation:
 		switch scenario {
 		case "sms5":
-			if trialEnd != "" {
-				send("sms5_with_date", label, trialEnd)
-			} else {
-				send("sms5_soon", label)
-			}
+			send("sms5", SmsData{TrialEndDate: trialEnd})
 		case "sms15":
-			send("sms15")
+			send("sms15", SmsData{})
 		default:
-			send("sms4", label)
+			send("sms4", SmsData{})
 		}
 	case whRemove:
 		if scenario == "sms14" {
-			send("sms14")
+			send("sms14", SmsData{})
 		} else {
-			send("sms_deactivated", label)
+			send("sms_deactivated", SmsData{})
 		}
 	default:
 		if len(order.Items) == 0 {
@@ -264,9 +267,15 @@ func (s *Viva) onCompletedHandler(ctx types.HandlerContext) {
 		}
 
 		product := cast.ToString(item.Product.Name)
-		if !send("sms2", product) {
+		data := SmsData{
+			ProductLabel:   product,
+			ActivationCode: code,
+			LicenseKey:     code,
+			DownloadURL:    url,
+		}
+		if !send("sms2", data) {
 			return
 		}
-		send("sms3", product, code, url)
+		send("sms3", data)
 	}
 }

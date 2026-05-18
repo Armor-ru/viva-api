@@ -16,7 +16,6 @@ type SmppConfig struct {
 		User     string `yaml:"user" json:"user"`
 		Password string `yaml:"password" json:"password"`
 	} `yaml:"auth" json:"auth"`
-	Template string `yaml:"template" json:"template"`
 }
 
 type ExtReq struct {
@@ -24,6 +23,14 @@ type ExtReq struct {
 	ProductCode string `json:"productCode" validate:"required"`
 	SmsScenario string `json:"smsScenario,omitempty"`
 	Locale      string `json:"locale,omitempty"`
+}
+
+type SmsData struct {
+	ProductLabel   string
+	ActivationCode string
+	LicenseKey     string
+	DownloadURL    string
+	TrialEndDate   string
 }
 
 const (
