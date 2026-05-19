@@ -1,6 +1,9 @@
 package viva_api
 
-import "github.com/Armor-ru/sds-go/pkg/types"
+import (
+	"github.com/Armor-ru/sds-go/pkg/types"
+	"github.com/Armor-ru/viva-api/internal/vivaclient"
+)
 
 func New(options ...func(*Viva)) Viva {
 	instance := Viva{}
@@ -38,5 +41,11 @@ func WithSmppConfig(config SmppConfig) func(*Viva) {
 func WithAccountId(accountId string) func(*Viva) {
 	return func(s *Viva) {
 		s.accountId = accountId
+	}
+}
+
+func WithVivaClient(client *vivaclient.Client) func(*Viva) {
+	return func(s *Viva) {
+		s.vivaClient = client
 	}
 }

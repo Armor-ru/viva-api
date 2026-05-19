@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"strings"
 
 	"github.com/Armor-ru/sds-go/pkg/config"
 	"github.com/Armor-ru/sds-go/pkg/logger"
@@ -10,6 +11,7 @@ import (
 	"github.com/Armor-ru/sds-go/pkg/transport"
 
 	viva_api "github.com/Armor-ru/viva-api/internal/app"
+	"github.com/Armor-ru/viva-api/internal/vivaclient"
 )
 
 var ServiceName = "viva-api"
@@ -26,6 +28,12 @@ type Conf struct {
 	TestTariffs []string            `yaml:"testTariffs"`
 	Channels    viva_api.Channels   `yaml:"channels"`
 	AccountId   string              `yaml:"accountId"`
+
+	VivaAPI struct {
+		BaseURL  string `yaml:"baseURL"`
+		UserName string `yaml:"userName"`
+		Password string `yaml:"password"`
+	} `yaml:"vivaApi"`
 }
 
 func init() {
@@ -60,12 +68,22 @@ func main() {
 	defer http.Disconnect()
 	http.Connect()
 
+	var client *vivaclient.Client
+	if strings.TrimSpace(cfg.VivaAPI.BaseURL) != "" {
+		client = vivaclient.New(vivaclient.Config{
+			BaseURL:  cfg.VivaAPI.BaseURL,
+			UserName: cfg.VivaAPI.UserName,
+			Password: cfg.VivaAPI.Password,
+		})
+	}
+
 	viva_api.New(
 		viva_api.WithIntTransport(nats),
 		viva_api.WithExtTransport(http),
 		viva_api.WithSecrets(cfg.ExtTransport.Secret),
 		viva_api.WithSmppConfig(cfg.SMPP),
 		viva_api.WithAccountId(cfg.AccountId),
+		viva_api.WithVivaClient(client),
 	)
 
 	nats.ConnectAndWait()

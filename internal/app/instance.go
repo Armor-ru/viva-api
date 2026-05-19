@@ -2,6 +2,7 @@ package viva_api
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"text/template"
 	"time"
@@ -10,6 +11,9 @@ import (
 	"github.com/Armor-ru/sds-go/pkg/tplext"
 	httpTransport "github.com/Armor-ru/sds-go/pkg/transport/http"
 	"github.com/Armor-ru/sds-go/pkg/types"
+	"github.com/Armor-ru/viva-api/internal/vivaclient"
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/google/uuid"
 
 	"github.com/spf13/cast"
@@ -28,7 +32,8 @@ type Viva struct {
 	SmsTpl     *template.Template
 	smppSender *SmppSender
 
-	accountId string
+	accountId  string
+	vivaClient *vivaclient.Client
 }
 
 func (s *Viva) InitHandlers() {
@@ -38,6 +43,8 @@ func (s *Viva) InitHandlers() {
 		s.extTransport.Subscribe("POST /ExtAppPartneerProductActivationRequest", s.ExtAppPartnerProductActivationRequestHandler)
 		s.extTransport.Subscribe("POST /ExtAppPartneerProductActivation", s.ExtAppPartnerProductActivationHandler)
 		s.extTransport.Subscribe("POST /ExtAppPartneerProductRemove", s.ExtAppPartnerProductRemoveHandler)
+		s.extTransport.Subscribe("POST /landing/init-subscription", s.LandingInitHandler)
+		s.extTransport.Subscribe("POST /landing/confirm-subscription", s.LandingConfirmHandler)
 	}
 
 	if s.intTransport != nil {
@@ -57,10 +64,29 @@ func (s *Viva) InitHandlers() {
 }
 
 func (s *Viva) initMiddleWare() {
-	s.extTransport.Middleware(httpTransport.Signature(httpTransport.SignatureConfig{
+	signature := httpTransport.Signature(httpTransport.SignatureConfig{
 		Secrets: s.secrets,
 		Header:  "X-Signature",
+	})
+
+	s.extTransport.Middleware(cors.New(cors.Config{
+		Next: func(c *fiber.Ctx) bool {
+			return !isLandingPath(c.Path())
+		},
+		AllowOrigins: "*",
+		AllowMethods: "POST,OPTIONS",
+		AllowHeaders: "Content-Type,Accept,X-MSISDN,X-Msisdn,X-Phone-Number",
 	}))
+	s.extTransport.Middleware(func(c *fiber.Ctx) error {
+		if isLandingPath(c.Path()) {
+			return c.Next()
+		}
+		return signature(c)
+	})
+}
+
+func isLandingPath(path string) bool {
+	return path == "/landing" || strings.HasPrefix(path, "/landing/")
 }
 
 func (s *Viva) ExtAppPartnerProductActivationRequestHandler(ctx types.HandlerContext) {
@@ -79,9 +105,25 @@ func (s *Viva) handleCreate(ctx types.HandlerContext, orderType types.OrderType)
 	data := ExtReq{}
 	ctx.Data(&data)
 
-	// Даные для заказа
-	phone := data.PhoneNum
-	externalID := data.ProductCode
+	if _, err := s.createOrder(orderType, data.PhoneNum, data.ProductCode); err != nil {
+		logger.Error().Msg("can not create order, " + err.Error())
+		return
+	}
+
+	ctx.Response("")
+}
+
+func (s *Viva) createOrder(orderType types.OrderType, phone, externalID string) (string, error) {
+	if s.intTransport == nil {
+		return "", fmt.Errorf("intTransport is not configured")
+	}
+
+	phone = strings.TrimSpace(phone)
+	externalID = strings.TrimSpace(externalID)
+	if phone == "" || externalID == "" {
+		return "", fmt.Errorf("phoneNum and productCode are required")
+	}
+
 	orderId := uuid.NewSHA1(uuid.MustParse(s.accountId), []byte(externalID+":"+phone)).String()
 
 	// Наполнение items для новых и orderId для старых заказов
@@ -108,11 +150,10 @@ func (s *Viva) handleCreate(ctx types.HandlerContext, orderType types.OrderType)
 		Timeout: 3 * time.Second,
 	})
 	if err != nil {
-		logger.Error().Interface("payload", newOrder).Msg("can not create order, " + err.Error())
-		return
+		return "", fmt.Errorf("send order/create: %w", err)
 	}
 
-	ctx.Response("")
+	return orderId, nil
 }
 
 func (s *Viva) onCompletedHandler(ctx types.HandlerContext) {
