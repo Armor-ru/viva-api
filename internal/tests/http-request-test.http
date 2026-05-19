@@ -9,7 +9,7 @@ X-Signature: {{signature}}
 
 {
   "phoneNum": "37477600552",
-  "productCode": "98e226fe-ce64-5ccb-885f-a5f9b2d77cc5"
+  "productCode": "SAFEKID"
 }
 
 ### Activation
@@ -19,7 +19,7 @@ X-Signature: {{signature}}
 
 {
   "phoneNum": "37477600552",
-  "productCode": "98e226fe-ce64-5ccb-885f-a5f9b2d77cc5"
+  "productCode": "SAFEKID"
 }
 
 ### Remove
@@ -29,5 +29,5 @@ X-Signature: {{signature}}
 
 {
   "phoneNum": "37477600552",
-  "productCode": "98e226fe-ce64-5ccb-885f-a5f9b2d77cc5"
+  "productCode": "SAFEKID"
 }
