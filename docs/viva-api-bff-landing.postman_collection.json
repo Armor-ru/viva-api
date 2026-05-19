@@ -1,0 +1,584 @@
+{
+  "info": {
+    "name": "viva-api BFF — Landing + Viva webhooks",
+    "description": "Коллекция для сервиса **viva-api** (`cmd/viva-api/main.go`).\n\n**Лендинг:** `POST /landing/init-subscription` → Viva InitSubscription; `POST /landing/confirm-subscription` → Viva ConfirmSubscription + `order/create` (NATS).\n\n**MSISDN:** заголовки `X-MSISDN` / `X-Msisdn` / `X-Phone-Number` или поле `phoneNum` в JSON (`internal/app/landing.go`).\n\n**Конфиг:** `extTransport` (HTTP), `extTransport.secret` (вебхуки), `vivaApi` (baseURL, userName, password) — см. `config/viva-api.yaml`.\n\n**Вебхуки:** `X-Signature` = HMAC-SHA256 hex от тела JSON + секрет из `extTransport.secret`.\n\n**Папка «0. Viva REST»** — прямые вызовы Viva (отладка, тот же контракт, что `internal/vivaclient`).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "variable": [
+    {
+      "key": "bff_base_url",
+      "value": "http://localhost:4000",
+      "description": "HTTP viva-api (extTransport.server), локально :4000"
+    },
+    {
+      "key": "viva_base_url",
+      "value": "https://viva.zsquare.ru/api/rest",
+      "description": "Базовый URL Viva Ext-App REST (vivaApi.baseURL)"
+    },
+    {
+      "key": "viva_username",
+      "value": "",
+      "description": "vivaApi.userName → POST .../auth/token"
+    },
+    {
+      "key": "viva_password",
+      "value": "",
+      "description": "vivaApi.password"
+    },
+    {
+      "key": "viva_token",
+      "value": "",
+      "description": "Заполняется запросом «Get Access Token»"
+    },
+    {
+      "key": "msisdn",
+      "value": "37493215362",
+      "description": "Тестовый номер абонента"
+    },
+    {
+      "key": "product_name",
+      "value": "SAFEKID",
+      "description": "productName для Init/Confirm (Viva Subscription API)"
+    },
+    {
+      "key": "otp_code",
+      "value": "",
+      "description": "OTP из SMS → Confirm"
+    },
+    {
+      "key": "webhook_secret",
+      "value": "TestSecretKey",
+      "description": "Первый элемент extTransport.secret в config/viva-api.yaml"
+    },
+    {
+      "key": "webhook_signature",
+      "value": "",
+      "description": "Считается pre-request скриптом папки «2. Viva → BFF webhooks»"
+    },
+    {
+      "key": "webhook_product_code",
+      "value": "SAFEKID",
+      "description": "productCode для вебхуков и Confirm — externalId продукта в SDS (order/create Items.ExternalId), не accountId"
+    },
+    {
+      "key": "viva_sub_no",
+      "value": "0",
+      "description": "subNo из GetSubscriberInfo — для AddTariffPlanProduct"
+    },
+    {
+      "key": "viva_tp_prod_id",
+      "value": "0",
+      "description": "prodId в TpProductDTO"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Viva REST — прямые вызовы",
+      "description": "Прямые запросы к Viva: сначала **Get Access Token**, затем методы с `Authorization: Bearer {{viva_token}}`. Повторяет контракт `internal/vivaclient` (Init/Confirm — query-параметры).",
+      "item": [
+        {
+          "name": "Get Access Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('viva_token', jsonData.access_token);",
+                  "    console.log('viva_token сохранён');",
+                  "} else {",
+                  "    console.error('Ошибка: ' + pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userName\": \"{{viva_username}}\",\n  \"password\": \"{{viva_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{viva_base_url}}/auth/token",
+            "description": "Тот же контракт, что `vivaclient` → `POST {baseURL}/auth/token`."
+          },
+          "response": []
+        },
+        {
+          "name": "GetSubscriberInfo",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{viva_token}}"
+              }
+            ],
+            "url": "{{viva_base_url}}/api/Subscriber/{{msisdn}}",
+            "description": "Не проксируется BFF; только для отладки на стенде Viva."
+          },
+          "response": []
+        },
+        {
+          "name": "Ping API (OPTIONS /auth/token)",
+          "request": {
+            "method": "OPTIONS",
+            "header": [],
+            "url": "{{viva_base_url}}/auth/token",
+            "description": "Проверка доступности API без выдачи токена."
+          },
+          "response": []
+        },
+        {
+          "name": "AddTariffPlanProduct",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{viva_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tpProduct\": {\n    \"msisdn\": \"{{msisdn}}\",\n    \"subNo\": {{viva_sub_no}},\n    \"expDate\": null,\n    \"prodId\": {{viva_tp_prod_id}}\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{viva_base_url}}/api/Subscriber/AddTariffPlanProduct",
+            "description": "Обновите viva_sub_no / viva_tp_prod_id после GetSubscriberInfo."
+          },
+          "response": []
+        },
+        {
+          "name": "AddChargeableProduct",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{viva_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tpProduct\": {\n    \"msisdn\": \"{{msisdn}}\",\n    \"subNo\": {{viva_sub_no}},\n    \"prodName\": \"{{product_name}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{viva_base_url}}/api/Subscriber/AddChargeableProduct",
+            "description": "Прямой вызов Viva; BFF не использует."
+          },
+          "response": []
+        },
+        {
+          "name": "GetProductsByPhoneNum",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{viva_token}}"
+              }
+            ],
+            "url": "{{viva_base_url}}/api/Subscription/GetProductsByPhoneNum?phoneNum={{msisdn}}",
+            "description": "Список подписок по номеру."
+          },
+          "response": []
+        },
+        {
+          "name": "InitSubscription (query)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{viva_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{viva_base_url}}/api/Subscription/InitSubscription?phoneNum={{msisdn}}&productName={{product_name}}",
+            "description": "Тот же вызов, что делает BFF через `vivaclient.InitSubscription`."
+          },
+          "response": []
+        },
+        {
+          "name": "ConfirmSubscription (query)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{viva_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{viva_base_url}}/api/Subscription/ConfirmSubscription?phoneNum={{msisdn}}&productName={{product_name}}&otp={{otp_code}}",
+            "description": "Заполните otp_code после Init. BFF дополнительно создаёт order при resultCode=0."
+          },
+          "response": []
+        },
+        {
+          "name": "RemoveSubscription (query)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var data = pm.response.json();",
+                  "if (pm.response.code === 200 && data.resultCode === 0) {",
+                  "    console.log('Подписка удалена');",
+                  "} else {",
+                  "    console.warn('Ошибка: ' + pm.response.text());",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{viva_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{viva_base_url}}/api/Subscription/RemoveSubscription?phoneNum={{msisdn}}&productName={{product_name}}",
+            "description": "Снимает подписку на стенде — после успеха можно снова Init."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1. Landing BFF (viva-api)",
+      "description": "Маршруты из `internal/app/instance.go`:\n- `POST /landing/init-subscription` → `LandingInitHandler`\n- `POST /landing/confirm-subscription` → `LandingConfirmHandler`\n\nБез Bearer. Обязательные поля: Init — `productName`; Confirm — `productName`, `otp`, `productCode`. Номер — заголовок MSISDN или `phoneNum`. Ответ Confirm: `{ confirm, orderId }`.",
+      "item": [
+        {
+          "name": "Init — Header Enrichment (X-MSISDN)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "console.log('Status:', pm.response.code, pm.response.text());"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-MSISDN",
+                "value": "{{msisdn}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productName\": \"{{product_name}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{bff_base_url}}/landing/init-subscription",
+            "description": "MSISDN только в заголовке. Далее Confirm с otp и productCode."
+          },
+          "response": []
+        },
+        {
+          "name": "Init — phoneNum в JSON",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var code = pm.response.code;",
+                  "console.log('Status:', code, pm.response.text());",
+                  "if (code === 200) { try { console.log(pm.response.json()); } catch (e) {} }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNum\": \"{{msisdn}}\",\n  \"productName\": \"{{product_name}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{bff_base_url}}/landing/init-subscription",
+            "description": "Без X-MSISDN — номер в теле. 503 если vivaApi.baseURL не задан."
+          },
+          "response": []
+        },
+        {
+          "name": "Confirm с OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "console.log('Status:', pm.response.code, pm.response.text());"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNum\": \"{{msisdn}}\",\n  \"productName\": \"{{product_name}}\",\n  \"otp\": \"{{otp_code}}\",\n  \"productCode\": \"{{webhook_product_code}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{bff_base_url}}/landing/confirm-subscription",
+            "description": "После успешного Viva Confirm (resultCode=0) создаётся order/create через NATS."
+          },
+          "response": []
+        },
+        {
+          "name": "Confirm — X-MSISDN + OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-MSISDN",
+                "value": "{{msisdn}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"productName\": \"{{product_name}}\",\n  \"otp\": \"{{otp_code}}\",\n  \"productCode\": \"{{webhook_product_code}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{bff_base_url}}/landing/confirm-subscription",
+            "description": "Номер из заголовка, без phoneNum в JSON."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Viva → BFF webhooks (X-Signature)",
+      "description": "Подпись **X-Signature** = HMAC-SHA256 hex (lower) от **того же JSON**, что в теле, и `{{webhook_secret}}` (= `extTransport.secret`). Pre-request считает подпись и upsert заголовка.",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "const secret = pm.collectionVariables.get('webhook_secret');",
+              "if (!secret) { throw new Error('Задайте webhook_secret (extTransport.secret)'); }",
+              "let rawBody = pm.request.body ? (pm.request.body.raw || '') : '';",
+              "if (typeof pm.variables.replaceIn === 'function') {",
+              "    rawBody = pm.variables.replaceIn(rawBody);",
+              "} else {",
+              "    ['msisdn', 'webhook_product_code'].forEach((k) => {",
+              "        const v = pm.collectionVariables.get(k);",
+              "        if (v !== undefined && v !== null) {",
+              "            rawBody = rawBody.split('{{' + k + '}}').join(v);",
+              "        }",
+              "    });",
+              "}",
+              "const sig = CryptoJS.HmacSHA256(rawBody, secret).toString(CryptoJS.enc.Hex);",
+              "pm.collectionVariables.set('webhook_signature', sig);",
+              "pm.request.headers.upsert({ key: 'X-Signature', value: sig });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "item": [
+        {
+          "name": "ExtAppPartneerProductActivationRequest",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Signature",
+                "value": "{{webhook_signature}}",
+                "description": "Подставляется pre-request скриптом папки"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNum\": \"{{msisdn}}\",\n  \"productCode\": \"{{webhook_product_code}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{bff_base_url}}/ExtAppPartneerProductActivationRequest",
+            "description": "OrderTypeNew — новая подписка (опечатка Partneer в пути — как в Viva spec)."
+          },
+          "response": []
+        },
+        {
+          "name": "ExtAppPartneerProductActivation (Renew)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Signature",
+                "value": "{{webhook_signature}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNum\": \"{{msisdn}}\",\n  \"productCode\": \"{{webhook_product_code}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{bff_base_url}}/ExtAppPartneerProductActivation",
+            "description": "OrderTypeRenew — продление."
+          },
+          "response": []
+        },
+        {
+          "name": "ExtAppPartneerProductRemove",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Signature",
+                "value": "{{webhook_signature}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phoneNum\": \"{{msisdn}}\",\n  \"productCode\": \"{{webhook_product_code}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{bff_base_url}}/ExtAppPartneerProductRemove",
+            "description": "OrderTypeCancel — отключение."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
