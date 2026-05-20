@@ -1,0 +1,22 @@
+name: Build and push
+
+on:
+  push:
+    tags:
+      - "*/*/*.*.*"
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-push:
+    runs-on: docker
+    steps:
+      - name: Build and push image
+        uses: https://git.dev.armlab.pro/armor/sds-deploy/.gitea/actions/build-by-tag@main
+        with:
+          registry-url: ${{ vars.REGISTRY_URL }}
+          registry-username: ${{ secrets.REGISTRY_USERNAME }}
+          registry-password: ${{ secrets.REGISTRY_PASSWORD }}
+          checkout-token: ${{ secrets.GITEA_TOKEN }}
+          submodule-token: ${{ secrets.GITEA_TOKEN }}

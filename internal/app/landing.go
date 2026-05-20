@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Armor-ru/sds-go/pkg/logger"
-	httpTransport "github.com/Armor-ru/sds-go/pkg/transport/http"
-	"github.com/Armor-ru/sds-go/pkg/types"
-	"github.com/Armor-ru/viva-api/internal/vivaclient"
+	"git.dev.armlab.pro/armor/sds-go/pkg/logger"
+	httpTransport "git.dev.armlab.pro/armor/sds-go/pkg/transport/http"
+	"git.dev.armlab.pro/armor/sds-go/pkg/types"
+	"git.dev.armlab.pro/armor/viva-api/internal/vivaclient"
 )
 
 const vivaRequestTimeout = 25 * time.Second

@@ -2,16 +2,16 @@ FROM golang:1.26-alpine AS build-app
 
 ARG APP_NAMESPACE
 ARG APP_NAME
+ARG GOPRIVATE
 ENV APP_NAMESPACE=$APP_NAMESPACE
 ENV APP_NAME=$APP_NAME
+ENV GOPRIVATE=$GOPRIVATE
 
 WORKDIR /opt/${APP_NAMESPACE}
 RUN apk add --no-cache git make
-RUN go env -w GOPRIVATE=github.com/Armor-ru/sds-go
-RUN --mount=type=secret,id=SUBMOD_AUTH \
-    git config --global url."https://$(cat /run/secrets/SUBMOD_AUTH)@github.com".insteadOf "https://github.com"
 COPY ./ ./
-RUN make build
+RUN --mount=type=secret,id=NETRC,target=/root/.netrc \
+    make build
 
 
 FROM alpine:3.21 AS pack-image

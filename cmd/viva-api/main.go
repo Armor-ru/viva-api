@@ -4,14 +4,14 @@ import (
 	"flag"
 	"strings"
 
-	"github.com/Armor-ru/sds-go/pkg/config"
-	"github.com/Armor-ru/sds-go/pkg/logger"
-	"github.com/Armor-ru/sds-go/pkg/systemd"
-	utilsTls "github.com/Armor-ru/sds-go/pkg/tls"
-	"github.com/Armor-ru/sds-go/pkg/transport"
+	"git.dev.armlab.pro/armor/sds-go/pkg/config"
+	"git.dev.armlab.pro/armor/sds-go/pkg/logger"
+	"git.dev.armlab.pro/armor/sds-go/pkg/systemd"
+	utilsTls "git.dev.armlab.pro/armor/sds-go/pkg/tls"
+	"git.dev.armlab.pro/armor/sds-go/pkg/transport"
 
-	viva_api "github.com/Armor-ru/viva-api/internal/app"
-	"github.com/Armor-ru/viva-api/internal/vivaclient"
+	viva_api "git.dev.armlab.pro/armor/viva-api/internal/app"
+	"git.dev.armlab.pro/armor/viva-api/internal/vivaclient"
 )
 
 var ServiceName = "viva-api"

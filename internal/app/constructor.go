@@ -1,8 +1,8 @@
 package viva_api
 
 import (
-	"github.com/Armor-ru/sds-go/pkg/types"
-	"github.com/Armor-ru/viva-api/internal/vivaclient"
+	"git.dev.armlab.pro/armor/sds-go/pkg/types"
+	"git.dev.armlab.pro/armor/viva-api/internal/vivaclient"
 )
 
 func New(options ...func(*Viva)) Viva {

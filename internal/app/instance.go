@@ -7,11 +7,11 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/Armor-ru/sds-go/pkg/logger"
-	"github.com/Armor-ru/sds-go/pkg/tplext"
-	httpTransport "github.com/Armor-ru/sds-go/pkg/transport/http"
-	"github.com/Armor-ru/sds-go/pkg/types"
-	"github.com/Armor-ru/viva-api/internal/vivaclient"
+	"git.dev.armlab.pro/armor/sds-go/pkg/logger"
+	"git.dev.armlab.pro/armor/sds-go/pkg/tplext"
+	httpTransport "git.dev.armlab.pro/armor/sds-go/pkg/transport/http"
+	"git.dev.armlab.pro/armor/sds-go/pkg/types"
+	"git.dev.armlab.pro/armor/viva-api/internal/vivaclient"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/google/uuid"
@@ -130,14 +130,14 @@ func (s *Viva) createOrder(orderType types.OrderType, phone, externalID string) 
 	var items []types.OrderItemRequest
 	if orderType == types.OrderTypeNew {
 		items = append(items, types.OrderItemRequest{
-			Id:         uuid.NewString(),
-			ExternalId: &externalID,
+			ID:         uuid.NewString(),
+			ExternalID: &externalID,
 		})
 	}
 
 	// Формируем тело заказа
 	newOrder := types.OrderCreateRequest{
-		Id:   orderId,
+		ID:   orderId,
 		Type: orderType,
 		Fields: types.JSON{
 			"phone": phone,

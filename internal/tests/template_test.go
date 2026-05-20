@@ -5,9 +5,9 @@ import (
 	"testing"
 	"text/template"
 
-	"github.com/Armor-ru/sds-go/pkg/tplext"
+	"git.dev.armlab.pro/armor/sds-go/pkg/tplext"
 
-	viva_api "github.com/Armor-ru/viva-api/internal/app"
+	viva_api "git.dev.armlab.pro/armor/viva-api/internal/app"
 )
 
 func TestSmsTemplatePluralize(t *testing.T) {
