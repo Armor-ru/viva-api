@@ -8,7 +8,10 @@ require (
 	github.com/gofiber/fiber/v2 v2.43.0
 	github.com/google/uuid v1.6.0
 	github.com/spf13/cast v1.5.0
+	gopkg.in/yaml.v3 v3.0.1
 )
+
+replace git.dev.armlab.pro/armor/sds-go => ../sds-go
 
 require (
 	github.com/andybalholm/brotli v1.0.5 // indirect
@@ -67,5 +70,4 @@ require (
 	golang.org/x/text v0.34.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

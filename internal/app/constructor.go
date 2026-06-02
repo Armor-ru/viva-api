@@ -32,9 +32,15 @@ func WithSecrets(secrets []string) func(*Viva) {
 	}
 }
 
-func WithSmppConfig(config SmppConfig) func(*Viva) {
+func WithSmppTransport(transport types.Transport) func(*Viva) {
 	return func(s *Viva) {
-		s.smpp = config
+		s.notifyTransport = transport
+	}
+}
+
+func WithSmsConfig(config SmsConfig) func(*Viva) {
+	return func(s *Viva) {
+		s.sms = config
 	}
 }
 

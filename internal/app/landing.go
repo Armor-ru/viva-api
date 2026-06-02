@@ -100,7 +100,7 @@ func (s *Viva) LandingConfirmHandler(ctx types.HandlerContext) {
 		return
 	}
 
-	orderId, err := s.createOrder(types.OrderTypeNew, phone, productCode)
+	orderId, err := s.createOrder(types.OrderTypeNew, phone, productCode, "")
 	if err != nil {
 		logger.Error().Err(err).Str("phone", phone).Str("productCode", productCode).Msg("create landing order")
 		landingErr(ctx, 502, err.Error())

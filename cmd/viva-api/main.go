@@ -3,12 +3,14 @@ package main
 import (
 	"flag"
 	"strings"
+	"time"
 
 	"git.dev.armlab.pro/armor/sds-go/pkg/config"
 	"git.dev.armlab.pro/armor/sds-go/pkg/logger"
 	"git.dev.armlab.pro/armor/sds-go/pkg/systemd"
 	utilsTls "git.dev.armlab.pro/armor/sds-go/pkg/tls"
 	"git.dev.armlab.pro/armor/sds-go/pkg/transport"
+	transportSmpp "git.dev.armlab.pro/armor/sds-go/pkg/transport/smpp"
 
 	viva_api "git.dev.armlab.pro/armor/viva-api/internal/app"
 	"git.dev.armlab.pro/armor/viva-api/internal/vivaclient"
@@ -25,6 +27,7 @@ type Conf struct {
 	} `yaml:"extTransport"`
 
 	SMPP        viva_api.SmppConfig `yaml:"smpp"`
+	SMS         viva_api.SmsConfig  `yaml:"sms"`
 	TestTariffs []string            `yaml:"testTariffs"`
 	Channels    viva_api.Channels   `yaml:"channels"`
 	AccountId   string              `yaml:"accountId"`
@@ -68,6 +71,22 @@ func main() {
 	defer http.Disconnect()
 	http.Connect()
 
+	smpp := transportSmpp.NewTransport(transportSmpp.Config{
+		Name:      ServiceName,
+		Endpoints: cfg.SMPP.Endpoint,
+		User:      cfg.SMPP.Auth.User,
+		Passwd:    cfg.SMPP.Auth.Password,
+		Address: transportSmpp.AddressConfig{
+			SourceAddr:    cfg.SMPP.Address.SourceAddr,
+			SourceAddrTON: cfg.SMPP.Address.SourceAddrTON,
+			SourceAddrNPI: cfg.SMPP.Address.SourceAddrNPI,
+			DestAddrTON:   cfg.SMPP.Address.DestAddrTON,
+			DestAddrNPI:   cfg.SMPP.Address.DestAddrNPI,
+		},
+		RespTimeout: 5 * time.Second,
+	})
+	defer smpp.Disconnect()
+
 	var client *vivaclient.Client
 	if strings.TrimSpace(cfg.VivaAPI.BaseURL) != "" {
 		client = vivaclient.New(vivaclient.Config{
@@ -81,7 +100,8 @@ func main() {
 		viva_api.WithIntTransport(nats),
 		viva_api.WithExtTransport(http),
 		viva_api.WithSecrets(cfg.ExtTransport.Secret),
-		viva_api.WithSmppConfig(cfg.SMPP),
+		viva_api.WithSmppTransport(smpp),
+		viva_api.WithSmsConfig(cfg.SMS),
 		viva_api.WithAccountId(cfg.AccountId),
 		viva_api.WithVivaClient(client),
 	)

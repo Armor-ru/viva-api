@@ -1,0 +1,49 @@
+{
+  "shortNumber": "1020",
+  "externalId": "SAFEKID",
+  "defaultLanguage": "ru",
+  "scenarios": {
+    "mo.1": [
+      { "command": "new" },
+      { "command": "notify", "params": { "tpl": "welcome_trial" } }
+    ],
+    "mo.STOP": [
+      { "command": "notify", "params": { "tpl": "stop" } }
+    ],
+    "mo.RUS": [
+      { "command": "notify", "params": { "tpl": "lang_ru" } }
+    ],
+    "mo.ARM": [
+      { "command": "notify", "params": { "tpl": "lang_arm" } }
+    ],
+    "mo.ENG": [
+      { "command": "notify", "params": { "tpl": "lang_en" } }
+    ],
+    "mo.help": [
+      { "command": "notify", "params": { "tpl": "help" } }
+    ],
+    "nats.order.completed": [
+      { "command": "notify", "params": { "tpl": "license" } }
+    ],
+    "nats.order.expires": [
+      { "command": "notify", "params": { "tpl": "trial_reminder" } }
+    ],
+    "webhook.activation": [
+      { "command": "renew" },
+      { "command": "notify", "params": { "tpl": "paid_welcome" } }
+    ]
+  },
+  "notifications": {
+    "ru": {
+      "welcome_trial": "Поздравляем! Услуга Kaspersky Safe Kids подключена. У Вас 2 дня для пробного использования. Цена 50 драмов/день. Чтобы отписаться, отправьте STOP на номер 1020.",
+      "license": "Kaspersky Safe Kids: {{.ActivationCode}}\n{{.DownloadURL}}",
+      "paid_welcome": "Поздравляем! Платная версия Kaspersky Safe Kids подключена. Цена 50 драмов/день. Чтобы отписаться, отправьте STOP на номер 1020.",
+      "trial_reminder": "Уважаемый абонент, пробный период скоро истекает. После окончания будет подключена платная версия. Стоимость: 50 драмов/день. Чтобы отключить, отправьте STOP на номер 1020.",
+      "stop": "Услуга деактивирована. Для повторной подписки отправьте SMS с текстом 1 на номер 1020.",
+      "lang_ru": "Уважаемый абонент, язык SMS-сообщений изменен на русский.",
+      "lang_arm": "Уважаемый абонент, язык SMS-сообщений изменен на армянский.",
+      "lang_en": "Уважаемый абонент, язык SMS-сообщений изменен на английский.",
+      "help": "Для подключения услуги отправьте SMS с текстом 1 на номер 1020. Для отключения — STOP. Для смены языка — ARM, RUS или ENG."
+    }
+  }
+}
