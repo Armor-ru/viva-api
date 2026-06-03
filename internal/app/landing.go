@@ -14,100 +14,97 @@ import (
 
 const vivaRequestTimeout = 25 * time.Second
 
-var msisdnHeaders = []string{"X-MSISDN", "X-Msisdn", "X-Phone-Number"}
+type SubscriptionInitRequest struct {
+	PhoneNum    string `json:"phoneNum"`
+	ProductName string `json:"productName" validate:"required"`
+	Lang        string `json:"lang"`
+}
 
-func (s *Viva) LandingInitHandler(ctx types.HandlerContext) {
-	if s.vivaClient == nil {
-		landingErr(ctx, 503, "viva api not configured")
-		return
-	}
+type SubscriptionConfirm struct {
+	PhoneNum    string `json:"phoneNum"`
+	ProductName string `json:"productName" validate:"required"`
+	OTP         string `json:"otp" validate:"required"`
+	ProductCode string `json:"productCode" validate:"required"`
+	Lang        string `json:"lang"`
+}
 
-	var body struct {
-		PhoneNum    string `json:"phoneNum"`
-		ProductName string `json:"productName"`
-	}
-	ctx.Data(&body)
+func (s *Viva) landingInitHandler(ctx types.HandlerContext) {
+	var req SubscriptionInitRequest
+	ctx.Data(&req)
 
-	productName := strings.TrimSpace(body.ProductName)
-	if productName == "" {
-		landingErr(ctx, 400, "productName required")
-		return
-	}
-	phone, err := landingPhone(ctx, body.PhoneNum)
+	phone, err := landingPhone(ctx, req.PhoneNum)
 	if err != nil {
 		landingErr(ctx, 400, err.Error())
 		return
 	}
+	req.PhoneNum = phone
 
-	c, cancel := context.WithTimeout(context.Background(), vivaRequestTimeout)
-	defer cancel()
-
-	res, err := s.vivaClient.InitSubscription(c, phone, productName)
+	res, err := s.landingInit(req)
 	if err != nil {
-		logger.Error().Err(err).Str("phone", phone).Msg("Viva InitSubscription")
 		landingErr(ctx, 502, err.Error())
 		return
 	}
 	_ = ctx.Response(map[string]interface{}{"init": res})
 }
 
-func (s *Viva) LandingConfirmHandler(ctx types.HandlerContext) {
-	if s.vivaClient == nil {
-		landingErr(ctx, 503, "viva api not configured")
-		return
-	}
+func (s *Viva) landingConfirmHandler(ctx types.HandlerContext) {
+	var req SubscriptionConfirm
+	ctx.Data(&req)
 
-	var body struct {
-		PhoneNum    string `json:"phoneNum"`
-		ProductName string `json:"productName"`
-		OTP         string `json:"otp"`
-		ProductCode string `json:"productCode"`
-	}
-	ctx.Data(&body)
-
-	productName := strings.TrimSpace(body.ProductName)
-	if productName == "" {
-		landingErr(ctx, 400, "productName required")
-		return
-	}
-	otp := strings.TrimSpace(body.OTP)
-	if otp == "" {
-		landingErr(ctx, 400, "otp required")
-		return
-	}
-	productCode := strings.TrimSpace(body.ProductCode)
-	if productCode == "" {
-		landingErr(ctx, 400, "productCode required")
-		return
-	}
-	phone, err := landingPhone(ctx, body.PhoneNum)
+	phone, err := landingPhone(ctx, req.PhoneNum)
 	if err != nil {
 		landingErr(ctx, 400, err.Error())
 		return
+	}
+	req.PhoneNum = phone
+
+	res, orderID, err := s.landingConfirm(req)
+	if err != nil {
+		landingErr(ctx, 502, err.Error())
+		return
+	}
+	_ = ctx.Response(map[string]interface{}{"confirm": res, "orderId": orderID})
+}
+
+func (s *Viva) landingInit(req SubscriptionInitRequest) (*vivaclient.ResponseModel, error) {
+	if s.vivaClient == nil {
+		return nil, fmt.Errorf("viva api not configured")
 	}
 
 	c, cancel := context.WithTimeout(context.Background(), vivaRequestTimeout)
 	defer cancel()
 
-	res, err := s.vivaClient.ConfirmSubscription(c, phone, productName, otp)
+	res, err := s.vivaClient.InitSubscription(c, req.PhoneNum, req.ProductName)
 	if err != nil {
-		logger.Error().Err(err).Str("phone", phone).Msg("Viva ConfirmSubscription")
-		landingErr(ctx, 502, err.Error())
-		return
+		logger.Error().Err(err).Str("phone", req.PhoneNum).Msg("Viva InitSubscription")
+		return nil, err
+	}
+	return res, nil
+}
+
+func (s *Viva) landingConfirm(req SubscriptionConfirm) (*vivaclient.ResponseModel, string, error) {
+	if s.vivaClient == nil {
+		return nil, "", fmt.Errorf("viva api not configured")
+	}
+
+	c, cancel := context.WithTimeout(context.Background(), vivaRequestTimeout)
+	defer cancel()
+
+	res, err := s.vivaClient.ConfirmSubscription(c, req.PhoneNum, req.ProductName, req.OTP)
+	if err != nil {
+		logger.Error().Err(err).Str("phone", req.PhoneNum).Msg("Viva ConfirmSubscription")
+		return nil, "", err
 	}
 	if res.ResultCode != 0 {
-		landingErr(ctx, 502, vivaSubErr(res))
-		return
+		return nil, "", fmt.Errorf("viva subscription resultCode=%d message=%v", res.ResultCode, res.Message)
 	}
 
-	orderId, err := s.createOrder(types.OrderTypeNew, phone, productCode)
-	if err != nil {
-		logger.Error().Err(err).Str("phone", phone).Str("productCode", productCode).Msg("create landing order")
-		landingErr(ctx, 502, err.Error())
-		return
+	orderID := s.getOrderId(req.PhoneNum, req.ProductCode)
+	if err := s.createOrder(types.OrderTypeNew, req.PhoneNum, req.ProductCode, req.Lang); err != nil {
+		logger.Error().Err(err).Str("phone", req.PhoneNum).Str("productCode", req.ProductCode).Msg("create landing order")
+		return nil, "", err
 	}
-
-	_ = ctx.Response(map[string]interface{}{"confirm": res, "orderId": orderId})
+	return res, orderID, nil
 }
 
 func landingPhone(ctx types.HandlerContext, bodyPhone string) (string, error) {
@@ -118,10 +115,9 @@ func landingPhone(ctx types.HandlerContext, bodyPhone string) (string, error) {
 		if value == "" {
 			continue
 		}
-		for _, name := range msisdnHeaders {
-			if strings.EqualFold(strings.TrimSpace(key), name) {
-				return strings.TrimPrefix(value, "+"), nil
-			}
+		switch strings.ToLower(strings.TrimSpace(key)) {
+		case "x-msisdn", "x-phone-number":
+			return strings.TrimPrefix(value, "+"), nil
 		}
 	}
 	if p := strings.TrimSpace(strings.TrimPrefix(bodyPhone, "+")); p != "" {
@@ -135,11 +131,4 @@ func landingErr(ctx types.HandlerContext, status int, msg string) {
 		Status:  status,
 		Payload: map[string]string{"error": msg},
 	})
-}
-
-func vivaSubErr(res *vivaclient.ResponseModel) string {
-	if res == nil {
-		return "viva: empty response"
-	}
-	return fmt.Sprintf("viva subscription resultCode=%d message=%v", res.ResultCode, res.Message)
 }

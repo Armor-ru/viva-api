@@ -6,7 +6,10 @@ import (
 )
 
 func New(options ...func(*Viva)) Viva {
-	instance := Viva{}
+	instance := Viva{
+		catalog:   NewCatalog(),
+		langStore: make(LangStore),
+	}
 	for _, option := range options {
 		option(&instance)
 	}
@@ -33,8 +36,18 @@ func WithSecrets(secrets []string) func(*Viva) {
 }
 
 func WithSmppConfig(config SmppConfig) func(*Viva) {
+	return func(s *Viva) {}
+}
+
+func WithUssdTransport(transport types.Transport) func(*Viva) {
 	return func(s *Viva) {
-		s.smpp = config
+		s.ussdTransport = transport
+	}
+}
+
+func WithCatalogDir(dir string) func(*Viva) {
+	return func(s *Viva) {
+		s.catalogDir = dir
 	}
 }
 

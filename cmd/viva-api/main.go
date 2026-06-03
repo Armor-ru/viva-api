@@ -3,12 +3,14 @@ package main
 import (
 	"flag"
 	"strings"
+	"time"
 
 	"git.dev.armlab.pro/armor/sds-go/pkg/config"
 	"git.dev.armlab.pro/armor/sds-go/pkg/logger"
 	"git.dev.armlab.pro/armor/sds-go/pkg/systemd"
 	utilsTls "git.dev.armlab.pro/armor/sds-go/pkg/tls"
 	"git.dev.armlab.pro/armor/sds-go/pkg/transport"
+	transportSmpp "git.dev.armlab.pro/armor/sds-go/pkg/transport/smpp"
 
 	viva_api "git.dev.armlab.pro/armor/viva-api/internal/app"
 	"git.dev.armlab.pro/armor/viva-api/internal/vivaclient"
@@ -25,6 +27,7 @@ type Conf struct {
 	} `yaml:"extTransport"`
 
 	SMPP        viva_api.SmppConfig `yaml:"smpp"`
+	CatalogDir  string              `yaml:"catalogDir"`
 	TestTariffs []string            `yaml:"testTariffs"`
 	Channels    viva_api.Channels   `yaml:"channels"`
 	AccountId   string              `yaml:"accountId"`
@@ -66,7 +69,15 @@ func main() {
 		Server: cfg.ExtTransport.Server,
 	})
 	defer http.Disconnect()
-	http.Connect()
+
+	smpp := transportSmpp.NewTransport(transportSmpp.Config{
+		Name:        ServiceName,
+		Endpoints:   cfg.SMPP.Endpoint,
+		User:        cfg.SMPP.Auth.User,
+		Passwd:      cfg.SMPP.Auth.Password,
+		RespTimeout: 5 * time.Second,
+	})
+	defer smpp.Disconnect()
 
 	var client *vivaclient.Client
 	if strings.TrimSpace(cfg.VivaAPI.BaseURL) != "" {
@@ -80,11 +91,22 @@ func main() {
 	viva_api.New(
 		viva_api.WithIntTransport(nats),
 		viva_api.WithExtTransport(http),
+		viva_api.WithUssdTransport(smpp),
 		viva_api.WithSecrets(cfg.ExtTransport.Secret),
 		viva_api.WithSmppConfig(cfg.SMPP),
+		viva_api.WithCatalogDir(cfg.CatalogDir),
 		viva_api.WithAccountId(cfg.AccountId),
 		viva_api.WithVivaClient(client),
 	)
+	if err := http.Connect(); err != nil {
+
+		logger.Error().Err(err).Msg("http connect failed")
+
+	}
+
+	if err := smpp.Connect(); err != nil {
+		logger.Error().Err(err).Msg("smpp connect failed")
+	}
 
 	nats.ConnectAndWait()
 }

@@ -1,0 +1,15 @@
+{
+  "shortNumber": "1024",
+  "externalId": "SAFEKID",
+  "defaultLanguage": "ru",
+  "rules": {
+    "1": [{ "command": "new", "params": {}}, { "command": "notify", "params": { "tpl": "new"}}],
+    "STOP": [{ "command": "notify", "params": { "tpl": "cancel"}}]
+  },
+  "notifications": {
+    "ru": {
+      "new": "Подключено {{.ExternalID}}",
+      "cancel": "Отключено {{.ExternalID}}"
+    }
+  }
+}
