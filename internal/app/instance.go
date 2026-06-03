@@ -27,7 +27,7 @@ type Viva struct {
 	langStore     LangStore
 
 	catalogDir string
-	catalog    Catalog
+	catalog    *Catalog
 	secrets    []string
 	accountId  string
 }
