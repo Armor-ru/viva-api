@@ -1,22 +1,32 @@
 intTransport:
   server: api.armlab.pro:4222
   tls:
-    crtFile: ./cert/tls.crt
-    keyFile: ./cert/tls.key
-    caFile: ./cert/ca.crt
+    # ~/Desktop/Projects/cert/viva-api/ (рядом с репозиторием viva-api)
+    crtFile: ../cert/viva-api/tls.crt
+    keyFile: ../cert/viva-api/tls.key
+    caFile: ../cert/viva-api/ca.crt
 extTransport:
   server: 0.0.0.0:4000
   secret:
     - TestSecretKey
 smpp:
-  endpoint: ["217.76.1.74:2775", "217.76.1.86:2775"]
+  endpoint: ["127.0.0.1:2775"]
   auth:
-    user: SafeKids
-    password: pass123
-  template: |-
-    {{.ProductName}}{{ if .Quantity }} for {{ pluralizeEn .Quantity "device" "devices" }}{{ end }}
-    Activation code: {{.ActivationCode}}
-    Download link: {{.DownloadURL}}
+    user: "smppclient1"
+    password: "password"
+  address:
+    sourceAddr: "1020"
+    sourceAddrTON: 5
+    sourceAddrNPI: 1
+    destAddrTON: 1
+    destAddrNPI: 1
+
+app:
+  catalogDir: catalog
+  defaultLanguage: ru
+  langPreferenceTTL: 2160h
+  # Base URL of the OTP confirmation landing page (query: phone, productName, productCode, lang).
+  landingConfirmURL: "https://example.com/confirm"
 
 accountId: 923e0af7-8c92-4078-b9e5-0894d4efc4f8
 

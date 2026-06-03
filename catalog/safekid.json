@@ -1,0 +1,43 @@
+{
+  "shortNumber": "1020",
+  "externalId": "SAFEKID",
+  "defaultLanguage": "ru",
+  "notifications": {
+    "ru": {
+      "service_deactivated": "Услуга деактивирована. Для повторной подписки отправьте SMS с текстом 1 на номер 1020. Инфо:",
+      "already_active": "Уважаемый абонент, услуга уже подключена. Инфо:",
+      "already_deactivated": "Уважаемый абонент, услуга уже отключена. Для повторной подписки отправьте SMS с текстом 1 на номер 1020. Инфо:",
+      "trial_expires": "Уважаемый абонент, {{.ExpiresAt}} пробный период истекает. После окончания пробного периода будет автоматически подключена платная версия. Стоимость: 50 драмов/день. Чтобы отключить, отправьте сообщение с текстом STOP на номер 1020. Инфо:",
+      "welcome_trial": "Поздравляем! Услуга Kaspersky Safe Kids подключена. Начните защищать Ваших детей от угроз интернета. Перейдите по ссылке {{.Link}} и скачайте мобильное приложение. У Вас 2 дня для пробного использования. По истечении пробного периода платная версия будет подключена автоматически. Цена 50 драмов/день. Далее, вы получите лицензионный код для введения в приложении. Чтобы отписаться, отправьте текст STOP на номер 1020. Чтобы изменить язык, отправьте ENG или ARM на номер 1020. Инфо:",
+      "welcome_paid": "Поздравляем! Платная версия услуги Kaspersky Safe Kids подключена. Начните защищать Ваших детей от угроз интернета. Цена 50 драмов/день. Далее, вы получите лицензионный код для введения в приложении. Чтобы отписаться, отправьте текст STOP на короткий номер 1020. Инфо:",
+      "license": "Kaspersky Safe Kids: {{.ActivationCode}}",
+      "otp_landing": "Kaspersky Safe Kids: введите код из SMS на странице подтверждения {{.LandingURL}}",
+      "language_changed": "Уважаемый абонент, язык SMS-сообщений изменен на русский. Инфо:",
+      "unknown_command": "Уважаемый абонент, для подключения услуги отправьте SMS с текстом 1 на номер 1020. Для отключения услуги отправьте SMS с текстом STOP на номер 1020. Для изменения языка SMS-сообщения отправьте, соответственно, ARM, RUS или ENG на короткий номер 1020. Инфо:"
+    },
+    "en": {
+      "service_deactivated": "The service is deactivated. To subscribe again, send an SMS with the text 1 to the number 1020. Info:",
+      "already_active": "Dear subscriber, the service is already activated. Info:",
+      "already_deactivated": "Dear subscriber, the service is already deactivated. To subscribe again, send an SMS with the text 1 to the number 1020. Info:",
+      "trial_expires": "Dear subscriber, the trial period provided to you expires on {{.ExpiresAt}}. After the end of trial period, the paid version will be automatically activated. Price: 50 AMD/day. To deactivate, send STOP to 1020 number. Info:",
+      "welcome_trial": "Congratulations! Kaspersky Safe Kids is activated. Start protecting your children from the threats of the Internet. Follow the link {{.Link}} and download the mobile application. You have 2 days for trial use. After the trial period, the paid version will be automatically activated. Price: 50 AMD/day. As a next step, you will get a license code to enter in the app. To unsubscribe, send STOP to 1020 number. To change the language, send RUS or ARM, respectively, to 1020 number. Info:",
+      "welcome_paid": "Congratulations! The chargeable version of Kaspersky Safe Kids is activated. Start protecting your children from the threats of the Internet. Price: 50 AMD/day. As a next step, you will get a license code to enter in the app. To unsubscribe, send the text STOP to 1020 number. Info:",
+      "license": "Kaspersky Safe Kids: {{.ActivationCode}}",
+      "otp_landing": "Kaspersky Safe Kids: enter the code from SMS on the confirmation page {{.LandingURL}}",
+      "language_changed": "Dear subscriber, the language of SMS messages has been changed to English. Info:",
+      "unknown_command": "Dear subscriber, to activate the service, send an SMS with the text 1 to the number 1020. To deactivate the service, send an SMS with the text STOP to the number 1020. To change the language of the SMS, send ARM, RUS or ENG, respectively, to 1020 number. Info:"
+    },
+    "arm": {
+      "service_deactivated": "Ծառայությունն ապաակտիվացված է: Կրկին բաժանորդագրվելու համար, 1020 համարին ուղարկեք 1 տեքստը պարունակող SMS հաղորդագրություն: Ինֆո՝",
+      "already_active": "Հարգելի բաժանորդ ծառայությունն արդեն ակտիվացված է: Ինֆո՝",
+      "already_deactivated": "Հարգելի բաժանորդ, ծառայությունն արդեն ապաակտիվացված է: Կրկին բաժանորդագրվելու համար 1020 համարին ուղարկեք 1 տեքստը պարունակող SMS հաղորդագրություն: Ինֆո՝",
+      "trial_expires": "Հարգելի բաժանորդ, {{.ExpiresAt}} Ձեզ տրամադրված փորձնական օգտագործման շրջանն ավարտվում է: Փորձնական շրջանի ավարտից հետո ավտոմատ կակտիվացվի վճարովի տարբերակը: Գինը՝ 50 դրամ/օր: Ապաբաժանորդագրվելու համար 1020 համարին ուղարկեք STOP տեքստը: Ինֆո՝",
+      "welcome_trial": "Շնորհավորում ենք: Kaspersky Safe Kids -ն ակտիվացված է: Սկսեք պաշտպանել Ձեր երեխաներին ինտերնետի սպառնալիքներից: Սեղմեք հղմանը {{.Link}} և ներբեռնեք բջջային հավելվածը: Դուք ունեք 2 օր փորձնական օգտագործման համար: Փորձնական շրջանի ավարտից հետո, վճարովի տարբերակը կակտիվանա ավտոմատ կերպով: Գինը՝ 50 դրամ/օր: Հաջորդիվ կստանաք լիցենզիոն կոդ՝ հավելվածում մուտքագրելու համար: Ապաբաժանորդագրվելու համար 1020 համարին ուղարկեք STOP տեքստը: Լեզուն փոխելու համար ուղարկեք RUS կամ ENG 1020 համարին: Ինֆո`",
+      "welcome_paid": "Շնորհավորում ենք: Kaspersky Safe Kids -ի վճարովի տարբերակն ակտիվացված է: Սկսեք պաշտպանել Ձեր երեխաներին ինտերնետի սպառնալիքներից: Գինը՝ 50 դրամ/օր: Հաջորդիվ կստանաք լիցենզիոն կոդ՝ հավելվածում մուտքագրելու համար: Ապաբաժանորդագրվելու համար 1020 համարին ուղարկեք STOP տեքստը: Ինֆո`",
+      "license": "Kaspersky Safe Kids: {{.ActivationCode}}",
+      "otp_landing": "Kaspersky Safe Kids: SMS-ով ստացված կոդը մուտքագրեք հաստատման էջում {{.LandingURL}}",
+      "language_changed": "Հարգելի բաժանորդ, SMS հաղորդագրությունների լեզուն փոխվել է հայերենի: Ինֆո՝",
+      "unknown_command": "Հարգելի բաժանորդ, ծառայության ակտիվացման համար 1020 համարին ուղարկեք 1 տեքստը պարունակող SMS: Ծառայության ապաակտիվացման համար 1020 համարին ուղարկեք STOP տեքստը պարունակող SMS: SMS հաղորդագրությունների լեզուն փոխելու համար 1020 համարին ուղարկեք համապատասխանաբար՝ ARM, RUS կամ ENG տեքստը: Ինֆո՝"
+    }
+  }
+}

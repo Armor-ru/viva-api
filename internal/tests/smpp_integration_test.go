@@ -33,7 +33,7 @@ func TestSMPP_Send_Integration(t *testing.T) {
 	cfg.Auth.User = user
 	cfg.Auth.Password = pass
 
-	sender := viva_api.NewSmppSender(cfg)
+	sender := NewSmppSender(cfg)
 
 	if err := sender.Send(msisdn, text); err != nil {
 		t.Fatalf("smpp send failed: %v", err)

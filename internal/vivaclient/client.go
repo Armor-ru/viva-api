@@ -28,10 +28,18 @@ type Client struct {
 }
 
 func New(cfg Config) *Client {
+	return NewWithHTTP(http.DefaultClient, cfg.BaseURL, cfg.UserName, cfg.Password)
+}
+
+// NewWithHTTP создаёт клиент с заданным HTTP-клиентом и base URL (в т.ч. для тестов).
+func NewWithHTTP(httpClient *http.Client, baseURL, userName, password string) *Client {
+	if httpClient == nil {
+		httpClient = http.DefaultClient
+	}
 	return &Client{
-		http:    http.DefaultClient,
-		baseURL: strings.TrimRight(strings.TrimSpace(cfg.BaseURL), "/"),
-		auth:    newTokenManager(cfg.UserName, cfg.Password),
+		http:    httpClient,
+		baseURL: strings.TrimRight(strings.TrimSpace(baseURL), "/"),
+		auth:    newTokenManager(userName, password),
 	}
 }
 
@@ -52,6 +60,17 @@ func (c *Client) ConfirmSubscription(ctx context.Context, phoneNum, productName 
 	var out ResponseModel
 	if err := c.do(ctx, path, &out); err != nil {
 		return nil, fmt.Errorf("confirm subscription: %w", err)
+	}
+
+	return &out, nil
+}
+
+func (c *Client) RemoveSubscription(ctx context.Context, phoneNum, productName string) (*ResponseModel, error) {
+	path := subscriptionPath("/api/Subscription/RemoveSubscription", phoneNum, productName, nil)
+
+	var out ResponseModel
+	if err := c.do(ctx, path, &out); err != nil {
+		return nil, fmt.Errorf("remove subscription: %w", err)
 	}
 
 	return &out, nil

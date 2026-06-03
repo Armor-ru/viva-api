@@ -1,69 +1,66 @@
 package viva_api
 
 import (
-	"bytes"
 	"fmt"
+	"os"
 	"strings"
-	"text/template"
-	"time"
 
 	"git.dev.armlab.pro/armor/sds-go/pkg/logger"
-	"git.dev.armlab.pro/armor/sds-go/pkg/tplext"
 	httpTransport "git.dev.armlab.pro/armor/sds-go/pkg/transport/http"
 	"git.dev.armlab.pro/armor/sds-go/pkg/types"
-	"git.dev.armlab.pro/armor/viva-api/internal/vivaclient"
+	"git.dev.armlab.pro/armor/viva-api/internal/app/catalog"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/google/uuid"
-
-	"github.com/spf13/cast"
 )
 
-type Viva struct {
-	intTransport types.Transport
-	extTransport types.Transport
-
-	secrets []string
-	smpp    SmppConfig
-
-	testTariffs []string
-	channels    Channels
-
-	SmsTpl     *template.Template
-	smppSender *SmppSender
-
-	accountId  string
-	vivaClient *vivaclient.Client
-}
-
-func (s *Viva) InitHandlers() {
+func (s *viva) InitHandlers() {
 	if s.extTransport != nil {
 		s.initMiddleWare()
 
-		s.extTransport.Subscribe("POST /ExtAppPartneerProductActivationRequest", s.ExtAppPartnerProductActivationRequestHandler)
-		s.extTransport.Subscribe("POST /ExtAppPartneerProductActivation", s.ExtAppPartnerProductActivationHandler)
-		s.extTransport.Subscribe("POST /ExtAppPartneerProductRemove", s.ExtAppPartnerProductRemoveHandler)
-		s.extTransport.Subscribe("POST /landing/init-subscription", s.LandingInitHandler)
-		s.extTransport.Subscribe("POST /landing/confirm-subscription", s.LandingConfirmHandler)
+		s.extTransport.Subscribe("POST /ExtAppPartneerProductActivationRequest", func(ctx types.HandlerContext) {
+			s.webhookHandler(ctx, types.OrderTypeNew)
+		})
+		s.extTransport.Subscribe("POST /ExtAppPartneerProductActivation", s.handleExtAppPartnerProductActivation)
+		s.extTransport.Subscribe("POST /ExtAppPartneerProductRemove", func(ctx types.HandlerContext) {
+			s.webhookHandler(ctx, types.OrderTypeCancel)
+		})
+		s.extTransport.Subscribe("POST /landing/init-subscription", s.landingInitHandler)
+		s.extTransport.Subscribe("POST /landing/confirm-subscription", s.landingConfirmHandler)
 	}
 
 	if s.intTransport != nil {
-		s.intTransport.Subscribe("order/completed", s.onCompletedHandler)
+		if _, err := s.intTransport.Subscribe("order/completed", s.orderCompleteHandler); err != nil {
+			logger.Error().Err(err).Str("topic", "order/completed").Msg("NATS subscribe failed")
+		} else {
+			logger.Info().
+				Str("topic", "order/completed").
+				Msg("subscribed on NATS for order/completed (SDS publishes after processing order/create)")
+		}
+		if _, err := s.intTransport.Subscribe(orderExpiresSubscribePath, s.orderExpiresHandler); err != nil {
+			logger.Error().Err(err).Str("path", orderExpiresSubscribePath).Msg("NATS subscribe failed")
+		} else {
+			logger.Info().
+				Str("path", orderExpiresSubscribePath).
+				Str("natsSubject", "order.expires").
+				Msg("subscribed on NATS for order.expires (SDS publishes one day before subscription end)")
+		}
 	}
 
-	tplText := s.smpp.Template
-	if tplText == "" {
-		tplText = "{{.ProductName}}{{ if .Quantity }} for {{ pluralizeEn .Quantity \"device\" \"devices\" }}{{ end }}\n" +
-			"Activation code: {{.ActivationCode}}\n" +
-			"Download link: {{.DownloadURL}}"
+	if err := s.loadCatalog(); err != nil {
+		panic(err)
 	}
-	SmsTpl, _ := template.New("sms").Funcs(tplext.Funcs).Parse(tplText)
-	s.SmsTpl = SmsTpl
 
-	s.smppSender = NewSmppSender(s.smpp)
+	if s.ussdTransport != nil {
+		if _, err := s.ussdTransport.Subscribe("smpp/inbound", s.ussdHandler); err != nil {
+			logger.Error().Err(err).Msg("notify inbound subscribe failed")
+		}
+		if err := s.ussdTransport.Connect(); err != nil {
+			logger.Error().Err(err).Msg("notify transport connect failed")
+		}
+	}
 }
 
-func (s *Viva) initMiddleWare() {
+func (s *viva) initMiddleWare() {
 	signature := httpTransport.Signature(httpTransport.SignatureConfig{
 		Secrets: s.secrets,
 		Header:  "X-Signature",
@@ -89,184 +86,25 @@ func isLandingPath(path string) bool {
 	return path == "/landing" || strings.HasPrefix(path, "/landing/")
 }
 
-func (s *Viva) ExtAppPartnerProductActivationRequestHandler(ctx types.HandlerContext) {
-	s.handleCreate(ctx, types.OrderTypeNew)
-}
-
-func (s *Viva) ExtAppPartnerProductActivationHandler(ctx types.HandlerContext) {
-	s.handleCreate(ctx, types.OrderTypeRenew)
-}
-
-func (s *Viva) ExtAppPartnerProductRemoveHandler(ctx types.HandlerContext) {
-	s.handleCreate(ctx, types.OrderTypeCancel)
-}
-
-func (s *Viva) handleCreate(ctx types.HandlerContext, orderType types.OrderType) {
-	data := ExtReq{}
-	ctx.Data(&data)
-
-	if _, err := s.createOrder(orderType, data.PhoneNum, data.ProductCode); err != nil {
-		logger.Error().Msg("can not create order, " + err.Error())
-		return
+func (s *viva) loadCatalog() error {
+	dir := strings.TrimSpace(s.catalogDir)
+	if dir == "" {
+		dir = "catalog"
+	}
+	if _, err := os.Stat(dir); err != nil {
+		return fmt.Errorf("stat catalog directory %q: %w", dir, err)
 	}
 
-	ctx.Response("")
-}
-
-func (s *Viva) createOrder(orderType types.OrderType, phone, externalID string) (string, error) {
-	if s.intTransport == nil {
-		return "", fmt.Errorf("intTransport is not configured")
+	cat := catalog.NewCatalog()
+	if err := cat.Load(dir); err != nil {
+		return err
 	}
-
-	phone = strings.TrimSpace(phone)
-	externalID = strings.TrimSpace(externalID)
-	if phone == "" || externalID == "" {
-		return "", fmt.Errorf("phoneNum and productCode are required")
+	defaultLang := ""
+	if s.langStore != nil {
+		defaultLang = s.langStore.DefaultLang()
 	}
-
-	orderId := uuid.NewSHA1(uuid.MustParse(s.accountId), []byte(externalID+":"+phone)).String()
-
-	// Наполнение items для новых и orderId для старых заказов
-	var items []types.OrderItemRequest
-	if orderType == types.OrderTypeNew {
-		items = append(items, types.OrderItemRequest{
-			ID:         uuid.NewString(),
-			ExternalID: &externalID,
-		})
-	}
-
-	// Формируем тело заказа
-	newOrder := types.OrderCreateRequest{
-		ID:   orderId,
-		Type: orderType,
-		Fields: types.JSON{
-			"phone": phone,
-		},
-		Items: items,
-	}
-
-	// Создаем заказ
-	_, err := s.intTransport.Send("order/create", newOrder, types.SendOptions{
-		Timeout: 3 * time.Second,
-	})
-	if err != nil {
-		return "", fmt.Errorf("send order/create: %w", err)
-	}
-
-	return orderId, nil
-}
-
-func (s *Viva) onCompletedHandler(ctx types.HandlerContext) {
-	order := types.OrderResponse{}
-	ctx.Data(&order)
-
-	logger.Info().Interface("order", order).Msg("receive order.completed")
-
-	if order.Status == "error" {
-		logger.Info().Str("orderId", order.ID).Msg("order status error, no need to send notify")
-		return
-	}
-
-	if len(order.Items) == 0 {
-		logger.Error().Str("orderId", order.ID).Msg("can not send notify, order items is empty")
-		return
-	}
-
-	hasSendSms := false
-	for _, it := range order.Items {
-		if it.Type == "activate" || it.Type == "reactivate" {
-			hasSendSms = true
-			break
-		}
-	}
-
-	if !hasSendSms {
-		logger.Info().Str("orderId", order.ID).Msg("no need to send notify with activation code")
-		return
-	}
-
-	item := order.Items[0]
-
-	activationCode := strings.TrimSpace(cast.ToString(item.Artifacts["ActivationCode"]))
-	if activationCode == "" {
-		logger.Error().Str("orderId", order.ID).Msg("can not send notify, ActivationCode is empty")
-		return
-	}
-
-	// Raw Download
-	rawDownload, ok := item.Artifacts["download"].([]interface{})
-	if !ok {
-		rawDownload = []interface{}{}
-	}
-
-	// download convert
-	downloads := make([]map[string]interface{}, 0, len(rawDownload))
-	for _, v := range rawDownload {
-		if m, ok := v.(map[string]interface{}); ok {
-			downloads = append(downloads, m)
-		}
-	}
-
-	if len(downloads) == 0 {
-		logger.Error().Str("orderId", order.ID).Msg("can not send notify, artifacts download not found")
-		return
-	}
-
-	downloadURL := strings.TrimSpace(cast.ToString(downloads[0]["url"]))
-	if downloadURL == "" {
-		logger.Error().Str("orderId", order.ID).Msg("can not send notify, DownloadURL is empty")
-		return
-	}
-
-	// productName := cast.ToString(item.Product.Name)
-	// if productName == "" {
-	// 	logger.Error().Str("orderId", order.ID).Msg("can not send notify, product name is empty")
-	// }
-
-	smsData := SmsData{
-		ProductName:    cast.ToString(item.Product.Name),
-		Quantity:       0,
-		ActivationCode: activationCode,
-		DownloadURL:    downloadURL,
-	}
-
-	if quantity, ok := item.Options["quantity"]; ok {
-		smsData.Quantity = cast.ToInt(quantity)
-	}
-
-	var smsMessage bytes.Buffer
-	if err := s.SmsTpl.Execute(&smsMessage, smsData); err != nil {
-		logger.Error().Str("orderId", order.ID).Msg("render notify template failed, " + err.Error())
-		return
-	}
-
-	rawPhone, ok := order.Fields["phone"]
-	if !ok {
-		logger.Error().Str("orderId", order.ID).Interface("fields", order.Fields).Msg("can not send notify, order has no phone")
-		return
-	}
-
-	phone := strings.TrimSpace(cast.ToString(rawPhone))
-	if phone == "" {
-		logger.Error().Str("orderId", order.ID).Msg("can not send notify, phone is empty")
-		return
-	}
-
-	logger.Info().Str("orderId", order.ID).Str("phone", phone).Str("text", smsMessage.String()).Msg("send notify with activation code and download link")
-
-	// Разделяем данные для grafana
-	if err := s.smppSender.Send(phone, smsMessage.String()); err != nil {
-		smppErr := err.(*SmppError)
-
-		log := logger.Error().Str("orderId", order.ID)
-
-		for k, v := range smppErr.Fields {
-			log = log.Interface(k, v)
-		}
-
-		log.Msg("send smpp notify failed, " + err.Error())
-		return
-	}
-
-	logger.Info().Str("orderId", order.ID).Str("phone", phone).Msg("notify sent successfully")
+	_ = cat.SetDefaultLang(defaultLang)
+	s.catalog = cat
+	logger.Info().Str("path", dir).Msg("catalog loaded")
+	return nil
 }

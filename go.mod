@@ -3,7 +3,7 @@ module git.dev.armlab.pro/armor/viva-api
 go 1.26.1
 
 require (
-	git.dev.armlab.pro/armor/sds-go v1.1.0
+	git.dev.armlab.pro/armor/sds-go v1.1.3
 	github.com/fiorix/go-smpp v0.0.0-20210403173735-2894b96e70ba
 	github.com/gofiber/fiber/v2 v2.43.0
 	github.com/google/uuid v1.6.0
@@ -69,3 +69,5 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace git.dev.armlab.pro/armor/sds-go => ../sds-go

@@ -16,27 +16,53 @@ const vivaRequestTimeout = 25 * time.Second
 
 var msisdnHeaders = []string{"X-MSISDN", "X-Msisdn", "X-Phone-Number"}
 
-func (s *Viva) LandingInitHandler(ctx types.HandlerContext) {
-	if s.vivaClient == nil {
-		landingErr(ctx, 503, "viva api not configured")
-		return
-	}
+type SubscriptionInitRequest struct {
+	PhoneNum    string `json:"phoneNum"`
+	ProductName string `json:"productName"`
+	Lang        string `json:"lang"`
+}
 
-	var body struct {
-		PhoneNum    string `json:"phoneNum"`
-		ProductName string `json:"productName"`
-	}
-	ctx.Data(&body)
+type SubscriptionConfirmRequest struct {
+	PhoneNum    string `json:"phoneNum"`
+	ProductName string `json:"productName"`
+	OTP         string `json:"otp"`
+	ProductCode string `json:"productCode"`
+	Lang        string `json:"lang"`
+}
 
-	productName := strings.TrimSpace(body.ProductName)
-	if productName == "" {
-		landingErr(ctx, 400, "productName required")
-		return
-	}
-	phone, err := landingPhone(ctx, body.PhoneNum)
+func (s *viva) landingInitHandler(ctx types.HandlerContext) {
+	var req SubscriptionInitRequest
+	ctx.Data(&req)
+	res, err := s.landingInit(req, ctx)
 	if err != nil {
-		landingErr(ctx, 400, err.Error())
+		landingErr(ctx, landingStatus(err), err.Error())
 		return
+	}
+	_ = ctx.Response(map[string]interface{}{"init": res})
+}
+
+func (s *viva) landingConfirmHandler(ctx types.HandlerContext) {
+	var req SubscriptionConfirmRequest
+	ctx.Data(&req)
+	res, orderID, err := s.landingConfirm(req, ctx)
+	if err != nil {
+		landingErr(ctx, landingStatus(err), err.Error())
+		return
+	}
+	_ = ctx.Response(map[string]interface{}{"confirm": res, "orderId": orderID})
+}
+
+func (s *viva) landingInit(req SubscriptionInitRequest, ctx types.HandlerContext) (interface{}, error) {
+	if s.vivaClient == nil {
+		return nil, landingHTTPError{status: 503, msg: "viva api not configured"}
+	}
+	productName := strings.TrimSpace(req.ProductName)
+	if productName == "" {
+		return nil, landingHTTPError{status: 400, msg: "productName required"}
+	}
+	phone, err := landingPhone(ctx, req.PhoneNum)
+	if err != nil {
+		return nil, landingHTTPError{status: 400, msg: err.Error()}
 	}
 
 	c, cancel := context.WithTimeout(context.Background(), vivaRequestTimeout)
@@ -45,45 +71,30 @@ func (s *Viva) LandingInitHandler(ctx types.HandlerContext) {
 	res, err := s.vivaClient.InitSubscription(c, phone, productName)
 	if err != nil {
 		logger.Error().Err(err).Str("phone", phone).Msg("Viva InitSubscription")
-		landingErr(ctx, 502, err.Error())
-		return
+		return nil, landingHTTPError{status: 502, msg: err.Error()}
 	}
-	_ = ctx.Response(map[string]interface{}{"init": res})
+	return res, nil
 }
 
-func (s *Viva) LandingConfirmHandler(ctx types.HandlerContext) {
+func (s *viva) landingConfirm(req SubscriptionConfirmRequest, ctx types.HandlerContext) (interface{}, string, error) {
 	if s.vivaClient == nil {
-		landingErr(ctx, 503, "viva api not configured")
-		return
+		return nil, "", landingHTTPError{status: 503, msg: "viva api not configured"}
 	}
-
-	var body struct {
-		PhoneNum    string `json:"phoneNum"`
-		ProductName string `json:"productName"`
-		OTP         string `json:"otp"`
-		ProductCode string `json:"productCode"`
-	}
-	ctx.Data(&body)
-
-	productName := strings.TrimSpace(body.ProductName)
+	productName := strings.TrimSpace(req.ProductName)
 	if productName == "" {
-		landingErr(ctx, 400, "productName required")
-		return
+		return nil, "", landingHTTPError{status: 400, msg: "productName required"}
 	}
-	otp := strings.TrimSpace(body.OTP)
+	otp := strings.TrimSpace(req.OTP)
 	if otp == "" {
-		landingErr(ctx, 400, "otp required")
-		return
+		return nil, "", landingHTTPError{status: 400, msg: "otp required"}
 	}
-	productCode := strings.TrimSpace(body.ProductCode)
+	productCode := strings.TrimSpace(req.ProductCode)
 	if productCode == "" {
-		landingErr(ctx, 400, "productCode required")
-		return
+		return nil, "", landingHTTPError{status: 400, msg: "productCode required"}
 	}
-	phone, err := landingPhone(ctx, body.PhoneNum)
+	phone, err := landingPhone(ctx, req.PhoneNum)
 	if err != nil {
-		landingErr(ctx, 400, err.Error())
-		return
+		return nil, "", landingHTTPError{status: 400, msg: err.Error()}
 	}
 
 	c, cancel := context.WithTimeout(context.Background(), vivaRequestTimeout)
@@ -92,22 +103,37 @@ func (s *Viva) LandingConfirmHandler(ctx types.HandlerContext) {
 	res, err := s.vivaClient.ConfirmSubscription(c, phone, productName, otp)
 	if err != nil {
 		logger.Error().Err(err).Str("phone", phone).Msg("Viva ConfirmSubscription")
-		landingErr(ctx, 502, err.Error())
-		return
+		return nil, "", landingHTTPError{status: 502, msg: err.Error()}
 	}
 	if res.ResultCode != 0 {
-		landingErr(ctx, 502, vivaSubErr(res))
-		return
+		return nil, "", landingHTTPError{status: 502, msg: vivaSubErr(res)}
 	}
 
-	orderId, err := s.createOrder(types.OrderTypeNew, phone, productCode)
-	if err != nil {
+	lang := strings.TrimSpace(req.Lang)
+	if lang == "" {
+		lang = s.resolveLang(phone, s.defaultLanguageForProductCode(productCode))
+	}
+
+	orderID := s.getOrderId(phone, productCode)
+	if err := s.createOrder(types.OrderTypeNew, phone, productCode, lang); err != nil {
 		logger.Error().Err(err).Str("phone", phone).Str("productCode", productCode).Msg("create landing order")
-		landingErr(ctx, 502, err.Error())
-		return
+		return nil, "", landingHTTPError{status: 502, msg: err.Error()}
 	}
+	return res, orderID, nil
+}
 
-	_ = ctx.Response(map[string]interface{}{"confirm": res, "orderId": orderId})
+type landingHTTPError struct {
+	status int
+	msg    string
+}
+
+func (e landingHTTPError) Error() string { return e.msg }
+
+func landingStatus(err error) int {
+	if he, ok := err.(landingHTTPError); ok {
+		return he.status
+	}
+	return 502
 }
 
 func landingPhone(ctx types.HandlerContext, bodyPhone string) (string, error) {
@@ -120,11 +146,11 @@ func landingPhone(ctx types.HandlerContext, bodyPhone string) (string, error) {
 		}
 		for _, name := range msisdnHeaders {
 			if strings.EqualFold(strings.TrimSpace(key), name) {
-				return strings.TrimPrefix(value, "+"), nil
+				return normalizePhone(value), nil
 			}
 		}
 	}
-	if p := strings.TrimSpace(strings.TrimPrefix(bodyPhone, "+")); p != "" {
+	if p := normalizePhone(bodyPhone); p != "" {
 		return p, nil
 	}
 	return "", fmt.Errorf("phoneNum missing: provide it in body or MSISDN header")
