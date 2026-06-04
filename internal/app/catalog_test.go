@@ -3,6 +3,7 @@ package viva_api
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestCatalog_LoadAndGetNotify(t *testing.T) {
@@ -31,8 +32,9 @@ func TestCatalog_LoadAndGetNotify(t *testing.T) {
 	if got := p2.GetNotify("license", map[string]interface{}{"ActivationCode": "ABC123"}, "ru"); got != "Kaspersky Safe Kids: ABC123" {
 		t.Fatalf("GetNotify(license) = %q", got)
 	}
-	got := p.GetNotify("trial_expires", map[string]interface{}{"ExpiresAt": "05.06.2026 12:00"}, "ru")
-	if got == "" || !strings.Contains(got, "05.06.2026 12:00") {
+	end := time.Date(2026, 6, 5, 12, 0, 0, 0, time.UTC)
+	got := p.GetNotify("trial_expires", map[string]interface{}{"EndTime": &end}, "ru")
+	if got == "" || !strings.Contains(got, "2026-06-05") {
 		t.Fatalf("GetNotify(trial_expires) = %q", got)
 	}
 }

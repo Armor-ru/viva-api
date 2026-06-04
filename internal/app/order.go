@@ -151,8 +151,7 @@ func (s *Viva) expireOrder(order Order) error {
 		return err
 	}
 
-	expiresAt := orderExpiresAt(order)
-	if expiresAt == "" {
+	if order.EndTime == nil {
 		return errs.WrapWithFields(
 			fmt.Errorf("order has no endTime for trial expiry sms"),
 			map[string]interface{}{"orderId": order.ID},
@@ -164,7 +163,7 @@ func (s *Viva) expireOrder(order Order) error {
 		"Phone":      phone,
 		"ExternalID": productCode,
 		"Language":   lang,
-		"ExpiresAt":  expiresAt,
+		"EndTime":    order.EndTime,
 	}, lang)
 }
 
@@ -268,13 +267,6 @@ func completionNotifyItem(order Order) (types.OrderItemResponse, string, bool) {
 		}
 	}
 	return types.OrderItemResponse{}, "", false
-}
-
-func orderExpiresAt(order Order) string {
-	if order.EndTime == nil {
-		return ""
-	}
-	return order.EndTime.Format("02.01.2006 15:04")
 }
 
 func orderNotifyLang(s *Viva, order Order, phone string) string {

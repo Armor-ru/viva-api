@@ -42,18 +42,6 @@ func TestCreateOrder_SendsRequest(t *testing.T) {
 	}
 }
 
-func TestOrderExpiresAt(t *testing.T) {
-	t.Parallel()
-
-	end := time.Date(2026, 6, 5, 12, 0, 0, 0, time.UTC)
-	if got := orderExpiresAt(Order{EndTime: &end}); got != "05.06.2026 12:00" {
-		t.Fatalf("orderExpiresAt() = %q", got)
-	}
-	if got := orderExpiresAt(Order{}); got != "" {
-		t.Fatalf("orderExpiresAt() empty = %q", got)
-	}
-}
-
 func TestCompletionNotifyItem(t *testing.T) {
 	t.Parallel()
 
