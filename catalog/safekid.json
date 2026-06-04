@@ -1,6 +1,7 @@
 {
   "shortNumber": "1020",
   "externalId": "SAFEKID",
+  "landingConfirmUrl": "https://landing/confirm",
   "notifications": {
     "ru": {
       "already_active": "Уважаемый абонент, услуга уже подключена. Инфо:",

@@ -14,9 +14,10 @@ import (
 )
 
 type Product struct {
-	ShortNumber   string                 `json:"shortNumber"`
-	ExternalId    string                 `json:"externalId"`
-	Notifications map[string]interface{} `json:"notifications"`
+	ShortNumber       string                 `json:"shortNumber"`
+	ExternalId        string                 `json:"externalId"`
+	LandingConfirmURL string                 `json:"landingConfirmUrl"`
+	Notifications     map[string]interface{} `json:"notifications"`
 }
 
 func (p *Product) GetNotify(key string, data map[string]interface{}, lang ...string) string {
@@ -106,6 +107,7 @@ func (c *Catalog) Load(dir string) error {
 
 		item.ShortNumber = strings.TrimSpace(item.ShortNumber)
 		item.ExternalId = strings.TrimSpace(item.ExternalId)
+		item.LandingConfirmURL = strings.TrimSpace(item.LandingConfirmURL)
 
 		if item.ShortNumber == "" {
 			return errs.WrapWithFields(

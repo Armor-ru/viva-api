@@ -6,48 +6,21 @@ import (
 	"strings"
 
 	"git.dev.armlab.pro/armor/sds-go/pkg/errs"
-	"git.dev.armlab.pro/armor/sds-go/pkg/logger"
-	"git.dev.armlab.pro/armor/sds-go/pkg/types"
 )
 
-type UssdRequest struct {
-	Phone       string `json:"sourceAddr" validate:"required"`
-	ShortNumber string `json:"destinationAddr" validate:"required"`
-	Text        string `json:"shortMessage" validate:"required"`
-}
-
-func (s *Viva) buildLandingConfirmURL(phone, productName, productCode, lang string) (string, error) {
-	base := strings.TrimSpace(s.landingConfirmURL)
+func (s *Viva) buildLandingConfirmURL(base, phone string) (string, error) {
+	base = strings.TrimSpace(base)
 	if base == "" {
 		return "", fmt.Errorf("landing confirm url is empty")
 	}
 	u, err := url.Parse(base)
 	if err != nil {
-		return "", fmt.Errorf("landing confirm url: %w", err)
+		return "", fmt.Errorf("landing confirm url %w", err)
 	}
 	q := u.Query()
 	q.Set("phone", strings.TrimPrefix(strings.TrimSpace(phone), "+"))
-	q.Set("productName", strings.TrimSpace(productName))
-	q.Set("productCode", strings.TrimSpace(productCode))
-	if lang = strings.TrimSpace(lang); lang != "" {
-		q.Set("lang", lang)
-	}
 	u.RawQuery = q.Encode()
 	return u.String(), nil
-}
-
-func (s *Viva) ussdHandler(ctx types.HandlerContext) {
-	var req UssdRequest
-	ctx.Data(&req)
-	req.Phone = strings.TrimSpace(strings.TrimPrefix(req.Phone, "+"))
-	req.ShortNumber = strings.TrimSpace(req.ShortNumber)
-	req.Text = strings.TrimSpace(strings.ToUpper(req.Text))
-	logger.Info().
-		Str("phone", req.Phone).
-		Str("shortNumber", req.ShortNumber).
-		Str("text", req.Text).
-		Msg("smpp mo received")
-	s.ussd(req)
 }
 
 func (s *Viva) ussd(req UssdRequest) {
@@ -88,7 +61,7 @@ func (s *Viva) ussd(req UssdRequest) {
 				return
 			}
 
-			landingURL, err := s.buildLandingConfirmURL(req.Phone, product.ExternalId, product.ExternalId, lang)
+			landingURL, err := s.buildLandingConfirmURL(product.LandingConfirmURL, req.Phone)
 			if err != nil {
 				logAppError(err, "build landing url failed")
 				return

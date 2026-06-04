@@ -12,11 +12,6 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/cors"
 )
 
-type ExtReq struct {
-	PhoneNum    string `json:"phoneNum" validate:"required"`
-	ProductCode string `json:"productCode" validate:"required"`
-}
-
 type Viva struct {
 	intTransport  types.Transport
 	extTransport  types.Transport
@@ -64,6 +59,20 @@ func (s *Viva) InitHandlers() {
 			logger.Error().Err(err).Msg("smpp inbound subscribe failed")
 		}
 	}
+}
+
+func (s *Viva) ussdHandler(ctx types.HandlerContext) {
+	var req UssdRequest
+	ctx.Data(&req)
+	req.Phone = strings.TrimSpace(strings.TrimPrefix(req.Phone, "+"))
+	req.ShortNumber = strings.TrimSpace(req.ShortNumber)
+	req.Text = strings.TrimSpace(strings.ToUpper(req.Text))
+	logger.Info().
+		Str("phone", req.Phone).
+		Str("shortNumber", req.ShortNumber).
+		Str("text", req.Text).
+		Msg("smpp mo received")
+	s.ussd(req)
 }
 
 func (s *Viva) orderCompleteHandler(ctx types.HandlerContext) {
