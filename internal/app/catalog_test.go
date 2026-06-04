@@ -36,3 +36,18 @@ func TestCatalog_LoadAndGetNotify(t *testing.T) {
 		t.Fatalf("GetNotify(trial_expires) = %q", got)
 	}
 }
+
+func TestGetNotify_pluralize(t *testing.T) {
+	t.Parallel()
+
+	p := &Product{
+		Notifications: map[string]interface{}{
+			"ru": map[string]interface{}{
+				"devices": "{{ pluralize .Quantity \"устройство\" \"устройства\" \"устройств\" }}",
+			},
+		},
+	}
+	if got := p.GetNotify("devices", map[string]interface{}{"Quantity": 2}, "ru"); got != "2 устройства" {
+		t.Fatalf("GetNotify(pluralize) = %q", got)
+	}
+}

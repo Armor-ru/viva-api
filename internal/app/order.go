@@ -93,7 +93,7 @@ func (s *Viva) createOrder(orderType types.OrderType, phoneNum, productCode, lan
 
 	lang = strings.TrimSpace(lang)
 	if lang == "" {
-		lang = s.storedLang(phoneNum)
+		lang = s.GetLang(phoneNum)
 	}
 
 	req := types.OrderCreateRequest{
@@ -280,7 +280,7 @@ func orderExpiresAt(order Order) string {
 func orderNotifyLang(s *Viva, order Order, phone string) string {
 	lang := strings.TrimSpace(cast.ToString(order.CustomData["lang"]))
 	if lang == "" {
-		lang = s.storedLang(phone)
+		lang = s.GetLang(phone)
 	}
 	if lang == "" {
 		lang = "ru"

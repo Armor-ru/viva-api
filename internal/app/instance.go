@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
-	"time"
 
 	"git.dev.armlab.pro/armor/sds-go/pkg/errs"
 	"git.dev.armlab.pro/armor/sds-go/pkg/logger"
@@ -14,39 +13,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 )
-
-type LangStore map[string]langEntry
-
-type langEntry struct {
-	lang      string
-	expiresAt time.Time
-}
-
-const langPreferenceTTL = 24 * time.Hour
-
-func (s *Viva) storedLang(phone string) string {
-	phone = strings.TrimSpace(strings.TrimPrefix(phone, "+"))
-	if phone == "" {
-		return ""
-	}
-	e, ok := s.langStore[phone]
-	if !ok || time.Now().After(e.expiresAt) {
-		return ""
-	}
-	return strings.TrimSpace(e.lang)
-}
-
-func (s *Viva) storeLang(phone, lang string) {
-	phone = strings.TrimSpace(strings.TrimPrefix(phone, "+"))
-	lang = strings.TrimSpace(lang)
-	if phone == "" || lang == "" {
-		return
-	}
-	s.langStore[phone] = langEntry{
-		lang:      lang,
-		expiresAt: time.Now().Add(langPreferenceTTL),
-	}
-}
 
 type UssdRequest struct {
 	Phone       string `json:"sourceAddr" validate:"required"`
@@ -147,7 +113,7 @@ func (s *Viva) ussd(req UssdRequest) {
 		logAppError(err, "get product by short number failed")
 		return
 	}
-	lang := s.storedLang(req.Phone)
+	lang := s.GetLang(req.Phone)
 	if lang == "" {
 		lang = "ru"
 	}
@@ -235,7 +201,7 @@ func (s *Viva) ussd(req UssdRequest) {
 		case "ARM":
 			lang = "arm"
 		}
-		s.storeLang(req.Phone, lang)
+		s.SetLang(req.Phone, lang)
 		if err := s.sendProductNotify(product, req.Phone, "language_changed", map[string]interface{}{
 			"Phone": req.Phone, "ShortNumber": req.ShortNumber, "Language": lang,
 		}, lang); err != nil {

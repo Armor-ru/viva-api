@@ -10,6 +10,7 @@ import (
 	"text/template"
 
 	"git.dev.armlab.pro/armor/sds-go/pkg/errs"
+	"git.dev.armlab.pro/armor/sds-go/pkg/tplext"
 )
 
 type Product struct {
@@ -46,7 +47,7 @@ func (p *Product) GetNotify(key string, data map[string]interface{}, lang ...str
 		return ""
 	}
 
-	tpl, err := template.New("notify").Parse(text)
+	tpl, err := template.New("notify").Funcs(tplext.Funcs).Parse(text)
 	if err != nil {
 		return ""
 	}
