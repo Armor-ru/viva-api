@@ -37,7 +37,11 @@ func (s *Viva) ussd(req UssdRequest) {
 	case "1":
 		orderID := s.getOrderId(req.Phone, product.ExternalId)
 		order, err := s.getOrder(orderID)
-		exists := err == nil && strings.TrimSpace(order.ID) != ""
+		if err != nil {
+			logAppError(err, "get order failed")
+			return
+		}
+		exists := strings.TrimSpace(order.ID) != ""
 
 		data := map[string]interface{}{
 			"Phone":       req.Phone,
@@ -91,7 +95,11 @@ func (s *Viva) ussd(req UssdRequest) {
 		productCode := product.ExternalId
 		orderID := s.getOrderId(req.Phone, productCode)
 		order, err := s.getOrder(orderID)
-		exists := err == nil && strings.TrimSpace(order.ID) != ""
+		if err != nil {
+			logAppError(err, "get order failed")
+			return
+		}
+		exists := strings.TrimSpace(order.ID) != ""
 
 		data := map[string]interface{}{
 			"Phone":       req.Phone,
