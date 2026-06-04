@@ -201,24 +201,7 @@ func (s *Viva) ussd(req UssdRequest) {
 			)
 			return
 		}
-
-		text := product.GetNotify(key, data, lang)
-		if text == "" {
-			logAppError(
-				errs.WrapWithFields(
-					fmt.Errorf("notification template is empty"),
-					map[string]interface{}{
-						"shortNumber": req.ShortNumber,
-						"key":         key,
-						"lang":        lang,
-					},
-				),
-				"get notification failed",
-			)
-			return
-		}
-
-		if err := s.notify(req.Phone, text); err != nil {
+		if err := s.sendProductNotify(product, req.Phone, key, data, lang); err != nil {
 			logAppError(err, "notify failed")
 		}
 	case "STOP":
@@ -239,22 +222,7 @@ func (s *Viva) ussd(req UssdRequest) {
 			logAppError(err, "remove subscription failed")
 			return
 		}
-		text := product.GetNotify(key, data, lang)
-		if text == "" {
-			logAppError(
-				errs.WrapWithFields(
-					fmt.Errorf("notification template is empty"),
-					map[string]interface{}{
-						"shortNumber": req.ShortNumber,
-						"key":         key,
-						"lang":        lang,
-					},
-				),
-				"get notification failed",
-			)
-			return
-		}
-		if err := s.notify(req.Phone, text); err != nil {
+		if err := s.sendProductNotify(product, req.Phone, key, data, lang); err != nil {
 			logAppError(err, "notify failed")
 		}
 	case "RUS", "ENG", "ARM":
@@ -267,53 +235,18 @@ func (s *Viva) ussd(req UssdRequest) {
 			lang = "arm"
 		}
 		s.storeLang(req.Phone, lang)
-		text := product.GetNotify("language_changed", map[string]interface{}{
-			"Phone":       req.Phone,
-			"ShortNumber": req.ShortNumber,
-			"Language":    lang,
-		}, lang)
-		if text == "" {
-			logAppError(
-				errs.WrapWithFields(
-					fmt.Errorf("notification template is empty"),
-					map[string]interface{}{
-						"shortNumber": req.ShortNumber,
-						"key":         "language_changed",
-						"lang":        lang,
-					},
-				),
-				"get notification failed",
-			)
-			return
-		}
-		if err := s.notify(req.Phone, text); err != nil {
+		if err := s.sendProductNotify(product, req.Phone, "language_changed", map[string]interface{}{
+			"Phone": req.Phone, "ShortNumber": req.ShortNumber, "Language": lang,
+		}, lang); err != nil {
 			logAppError(err, "notify failed")
 		}
 	default:
-		text := product.GetNotify("unknown_command", map[string]interface{}{
-			"Phone":       req.Phone,
-			"ShortNumber": req.ShortNumber,
-			"Text":        req.Text,
-		}, lang)
-		if text == "" {
-			logAppError(
-				errs.WrapWithFields(
-					fmt.Errorf("notification template is empty"),
-					map[string]interface{}{
-						"shortNumber": req.ShortNumber,
-						"key":         "unknown_command",
-						"lang":        lang,
-					},
-				),
-				"get notification failed",
-			)
-			return
-		}
-		if err := s.notify(req.Phone, text); err != nil {
+		if err := s.sendProductNotify(product, req.Phone, "unknown_command", map[string]interface{}{
+			"Phone": req.Phone, "ShortNumber": req.ShortNumber, "Text": req.Text,
+		}, lang); err != nil {
 			logAppError(err, "notify failed")
 		}
 	}
-
 }
 
 func (s *Viva) orderCompleteHandler(ctx types.HandlerContext) {

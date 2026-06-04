@@ -43,3 +43,18 @@ func (s *Viva) notify(phone, text string) error {
 		Msg("smpp mt sent")
 	return nil
 }
+
+func (s *Viva) sendProductNotify(product *Product, phone, key string, data map[string]interface{}, lang string) error {
+	text := product.GetNotify(key, data, lang)
+	if text == "" {
+		return errs.WrapWithFields(
+			fmt.Errorf("notification template is empty"),
+			map[string]interface{}{
+				"shortNumber": product.ShortNumber,
+				"key":         key,
+				"lang":        lang,
+			},
+		)
+	}
+	return s.notify(phone, text)
+}
