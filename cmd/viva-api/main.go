@@ -8,10 +8,10 @@ import (
 	"git.dev.armlab.pro/armor/sds-go/pkg/config"
 	"git.dev.armlab.pro/armor/sds-go/pkg/logger"
 	"git.dev.armlab.pro/armor/sds-go/pkg/systemd"
-	"git.dev.armlab.pro/armor/sds-go/pkg/types"
 	utilsTls "git.dev.armlab.pro/armor/sds-go/pkg/tls"
 	"git.dev.armlab.pro/armor/sds-go/pkg/transport"
 	transportSmpp "git.dev.armlab.pro/armor/sds-go/pkg/transport/smpp"
+	"git.dev.armlab.pro/armor/sds-go/pkg/types"
 
 	viva_api "git.dev.armlab.pro/armor/viva-api/internal/app"
 	"git.dev.armlab.pro/armor/viva-api/internal/vivaclient"
@@ -125,9 +125,7 @@ func main() {
 		viva_api.WithLandingConfirmURL(cfg.LandingConfirmURL),
 	)
 	if err := http.Connect(); err != nil {
-
 		logger.Error().Err(err).Msg("http connect failed")
-
 	}
 
 	if err := smpp.Connect(); err != nil {

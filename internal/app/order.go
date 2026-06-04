@@ -129,6 +129,45 @@ func (s *Viva) createOrder(orderType types.OrderType, phoneNum, productCode, lan
 	return nil
 }
 
+func (s *Viva) expireOrder(order Order) error {
+	phone := strings.TrimSpace(cast.ToString(order.Fields["phone"]))
+	if phone == "" {
+		return errs.WrapWithFields(
+			fmt.Errorf("order has no phone"),
+			map[string]interface{}{"orderId": order.ID},
+		)
+	}
+
+	productCode := strings.TrimSpace(cast.ToString(order.CustomData["productCode"]))
+	if productCode == "" {
+		return errs.WrapWithFields(
+			fmt.Errorf("order has no productCode"),
+			map[string]interface{}{"orderId": order.ID},
+		)
+	}
+
+	product, err := s.catalog.GetProductByExternalId(productCode)
+	if err != nil {
+		return err
+	}
+
+	expiresAt := orderExpiresAt(order)
+	if expiresAt == "" {
+		return errs.WrapWithFields(
+			fmt.Errorf("order has no endTime for trial expiry sms"),
+			map[string]interface{}{"orderId": order.ID},
+		)
+	}
+
+	lang := orderNotifyLang(s, order, phone)
+	return s.sendProductNotify(product, phone, "trial_expires", map[string]interface{}{
+		"Phone":      phone,
+		"ExternalID": productCode,
+		"Language":   lang,
+		"ExpiresAt":  expiresAt,
+	}, lang)
+}
+
 func (s *Viva) completeOrder(order Order) error {
 	if order.Status == "error" {
 		return nil
@@ -140,14 +179,8 @@ func (s *Viva) completeOrder(order Order) error {
 		)
 	}
 
-	item := order.Items[0]
-	for _, it := range order.Items {
-		if it.Type == "activate" || it.Type == "reactivate" {
-			item = it
-			break
-		}
-	}
-	if item.Type != "activate" && item.Type != "reactivate" {
+	item, welcomeKey, ok := completionNotifyItem(order)
+	if !ok {
 		return nil
 	}
 
@@ -191,13 +224,7 @@ func (s *Viva) completeOrder(order Order) error {
 		return err
 	}
 
-	lang := strings.TrimSpace(cast.ToString(order.CustomData["lang"]))
-	if lang == "" {
-		lang = s.storedLang(phone)
-	}
-	if lang == "" {
-		lang = "ru"
-	}
+	lang := orderNotifyLang(s, order, phone)
 
 	data := map[string]interface{}{
 		"Phone":          phone,
@@ -210,7 +237,7 @@ func (s *Viva) completeOrder(order Order) error {
 		"Language":       lang,
 	}
 
-	if text := product.GetNotify("welcome_trial", data, lang); text != "" {
+	if text := product.GetNotify(welcomeKey, data, lang); text != "" {
 		if err := s.notify(phone, text); err != nil {
 			return err
 		}
@@ -229,6 +256,36 @@ func (s *Viva) completeOrder(order Order) error {
 	}
 
 	return s.notify(phone, text)
+}
+
+func completionNotifyItem(order Order) (types.OrderItemResponse, string, bool) {
+	for _, it := range order.Items {
+		switch it.Type {
+		case "activate", "reactivate":
+			return it, "welcome_trial", true
+		case "renew":
+			return it, "welcome_paid", true
+		}
+	}
+	return types.OrderItemResponse{}, "", false
+}
+
+func orderExpiresAt(order Order) string {
+	if order.EndTime == nil {
+		return ""
+	}
+	return order.EndTime.Format("02.01.2006 15:04")
+}
+
+func orderNotifyLang(s *Viva, order Order, phone string) string {
+	lang := strings.TrimSpace(cast.ToString(order.CustomData["lang"]))
+	if lang == "" {
+		lang = s.storedLang(phone)
+	}
+	if lang == "" {
+		lang = "ru"
+	}
+	return lang
 }
 
 func productCodeFromOrder(order Order, item types.OrderItemResponse) string {

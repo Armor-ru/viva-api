@@ -42,6 +42,43 @@ func TestCreateOrder_SendsRequest(t *testing.T) {
 	}
 }
 
+func TestOrderExpiresAt(t *testing.T) {
+	t.Parallel()
+
+	end := time.Date(2026, 6, 5, 12, 0, 0, 0, time.UTC)
+	if got := orderExpiresAt(Order{EndTime: &end}); got != "05.06.2026 12:00" {
+		t.Fatalf("orderExpiresAt() = %q", got)
+	}
+	if got := orderExpiresAt(Order{}); got != "" {
+		t.Fatalf("orderExpiresAt() empty = %q", got)
+	}
+}
+
+func TestCompletionNotifyItem(t *testing.T) {
+	t.Parallel()
+
+	item, key, ok := completionNotifyItem(Order{
+		Items: []types.OrderItemResponse{{Type: "renew", ID: "i1"}},
+	})
+	if !ok || key != "welcome_paid" || item.Type != "renew" {
+		t.Fatalf("renew: ok=%v key=%q type=%q", ok, key, item.Type)
+	}
+
+	_, key, ok = completionNotifyItem(Order{
+		Items: []types.OrderItemResponse{{Type: "activate", ID: "i2"}},
+	})
+	if !ok || key != "welcome_trial" {
+		t.Fatalf("activate: ok=%v key=%q", ok, key)
+	}
+
+	_, _, ok = completionNotifyItem(Order{
+		Items: []types.OrderItemResponse{{Type: "cancel", ID: "i3"}},
+	})
+	if ok {
+		t.Fatal("expected no completion item for cancel")
+	}
+}
+
 func TestIsActiveOrder(t *testing.T) {
 	t.Parallel()
 

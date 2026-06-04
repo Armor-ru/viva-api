@@ -22,7 +22,7 @@ type langEntry struct {
 	expiresAt time.Time
 }
 
-const langPreferenceTTL = 90 * 24 * time.Hour
+const langPreferenceTTL = 24 * time.Hour
 
 func (s *Viva) storedLang(phone string) string {
 	phone = strings.TrimSpace(strings.TrimPrefix(phone, "+"))
@@ -98,6 +98,7 @@ func (s *Viva) InitHandlers() {
 
 	if s.intTransport != nil {
 		s.intTransport.Subscribe("order/completed", s.orderCompleteHandler)
+		s.intTransport.Subscribe(s.accountId+".order/expires", s.orderExpiresHandler)
 	}
 
 	if s.ussdTransport != nil {
@@ -256,6 +257,16 @@ func (s *Viva) orderCompleteHandler(ctx types.HandlerContext) {
 	logger.Info().Interface("order", order).Msg("receive order.completed")
 	if err := s.completeOrder(order); err != nil {
 		logAppError(err, "complete order failed")
+	}
+}
+
+func (s *Viva) orderExpiresHandler(ctx types.HandlerContext) {
+	var order Order
+	ctx.Data(&order)
+
+	logger.Info().Interface("order", order).Msg("receive order.expires")
+	if err := s.expireOrder(order); err != nil {
+		logAppError(err, "expire order failed")
 	}
 }
 
