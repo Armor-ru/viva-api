@@ -8,14 +8,14 @@ import (
 	"path/filepath"
 	"strings"
 	"text/template"
+
+	"git.dev.armlab.pro/armor/sds-go/pkg/errs"
 )
 
 type Product struct {
-	ShortNumber     string                 `json:"shortNumber"`
-	ExternalId      string                 `json:"externalId"`
-	DefaultLanguage string                 `json:"defaultLanguage"`
-	Notifications   map[string]interface{} `json:"notifications"`
-	catalogLang     string                 `json:"-"`
+	ShortNumber   string                 `json:"shortNumber"`
+	ExternalId    string                 `json:"externalId"`
+	Notifications map[string]interface{} `json:"notifications"`
 }
 
 func (p *Product) GetNotify(key string, data map[string]interface{}, lang ...string) string {
@@ -23,17 +23,13 @@ func (p *Product) GetNotify(key string, data map[string]interface{}, lang ...str
 	if len(lang) > 0 {
 		l = strings.TrimSpace(lang[0])
 	}
-	if l == "" {
-		l = p.DefaultLanguage
-	}
-	if l == "" {
-		l = p.catalogLang
-	}
 
 	text := ""
 	if p.Notifications != nil {
-		if byLang, ok := p.Notifications[l].(map[string]interface{}); ok {
-			text, _ = byLang[key].(string)
+		if l != "" {
+			if byLang, ok := p.Notifications[l].(map[string]interface{}); ok {
+				text, _ = byLang[key].(string)
+			}
 		}
 		if text == "" {
 			for _, v := range p.Notifications {
@@ -54,16 +50,17 @@ func (p *Product) GetNotify(key string, data map[string]interface{}, lang ...str
 	if err != nil {
 		return ""
 	}
+
 	var buf bytes.Buffer
 	if err := tpl.Execute(&buf, data); err != nil {
 		return ""
 	}
+
 	return buf.String()
 }
 
 type Catalog struct {
-	products    []*Product
-	defaultLang string
+	products []*Product
 }
 
 func NewCatalog() *Catalog {
@@ -75,7 +72,10 @@ func NewCatalog() *Catalog {
 func (c *Catalog) Load(dir string) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return fmt.Errorf("read catalog directory: %w", err)
+		return errs.WrapWithFields(
+			fmt.Errorf("read catalog directory %w", err),
+			map[string]interface{}{"dir": dir},
+		)
 	}
 
 	c.products = make([]*Product, 0)
@@ -84,61 +84,104 @@ func (c *Catalog) Load(dir string) error {
 		if entry.IsDir() || !strings.HasSuffix(strings.ToLower(entry.Name()), ".json") {
 			continue
 		}
+
 		path := filepath.Join(dir, entry.Name())
+
 		raw, err := os.ReadFile(path)
 		if err != nil {
-			return fmt.Errorf("read catalog file %q: %w", path, err)
+			return errs.WrapWithFields(
+				fmt.Errorf("read catalog file %w", err),
+				map[string]interface{}{"path": path},
+			)
 		}
+
 		var item Product
 		if err := json.Unmarshal(raw, &item); err != nil {
-			return fmt.Errorf("decode catalog file %q: %w", path, err)
+			return errs.WrapWithFields(
+				fmt.Errorf("decode catalog file %w", err),
+				map[string]interface{}{"path": path},
+			)
 		}
 
 		item.ShortNumber = strings.TrimSpace(item.ShortNumber)
 		item.ExternalId = strings.TrimSpace(item.ExternalId)
-		item.DefaultLanguage = strings.TrimSpace(item.DefaultLanguage)
+
 		if item.ShortNumber == "" {
-			return fmt.Errorf("invalid catalog file %q: shortNumber is required", path)
-		}
-		if item.ExternalId == "" {
-			return fmt.Errorf("invalid catalog file %q: externalId is required", path)
+			return errs.WrapWithFields(
+				fmt.Errorf("catalog product shortNumber is required"),
+				map[string]interface{}{"path": path},
+			)
 		}
 
-		item.catalogLang = c.defaultLang
+		if item.ExternalId == "" {
+			return errs.WrapWithFields(
+				fmt.Errorf("catalog product externalId is required"),
+				map[string]interface{}{"path": path},
+			)
+		}
+
+		for _, p := range c.products {
+			if p.ShortNumber == item.ShortNumber {
+				return errs.WrapWithFields(
+					fmt.Errorf("duplicate catalog product shortNumber"),
+					map[string]interface{}{
+						"path":        path,
+						"shortNumber": item.ShortNumber,
+					},
+				)
+			}
+
+			if p.ExternalId == item.ExternalId {
+				return errs.WrapWithFields(
+					fmt.Errorf("duplicate catalog product externalId"),
+					map[string]interface{}{
+						"path":       path,
+						"externalId": item.ExternalId,
+					},
+				)
+			}
+		}
+
 		p := &item
 		c.products = append(c.products, p)
 	}
 
 	if len(c.products) == 0 {
-		return fmt.Errorf("catalog directory %q has no products", dir)
+		return errs.WrapWithFields(
+			fmt.Errorf("catalog directory has no products"),
+			map[string]interface{}{"dir": dir},
+		)
 	}
-	return nil
-}
 
-func (c *Catalog) SetDefaultLang(lang string) error {
-	c.defaultLang = strings.TrimSpace(lang)
-	for _, p := range c.products {
-		p.catalogLang = c.defaultLang
-	}
 	return nil
 }
 
 func (c *Catalog) GetProductByShortNumber(id string) (*Product, error) {
 	id = strings.TrimSpace(id)
+
 	for _, p := range c.products {
 		if p.ShortNumber == id {
 			return p, nil
 		}
 	}
-	return nil, fmt.Errorf("product by short number %q not found", id)
+
+	return nil, errs.WrapWithFields(
+		fmt.Errorf("product by short number not found"),
+		map[string]interface{}{"shortNumber": id},
+	)
 }
 
 func (c *Catalog) GetProductByExternalId(id string) (*Product, error) {
 	id = strings.TrimSpace(id)
+
 	for _, p := range c.products {
 		if p.ExternalId == id {
 			return p, nil
 		}
 	}
-	return nil, fmt.Errorf("product by external id %q not found", id)
+
+	return nil, errs.WrapWithFields(
+		fmt.Errorf("product by external id not found"),
+		map[string]interface{}{"externalId": id},
+	)
 }

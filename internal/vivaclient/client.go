@@ -57,6 +57,17 @@ func (c *Client) ConfirmSubscription(ctx context.Context, phoneNum, productName 
 	return &out, nil
 }
 
+func (c *Client) RemoveSubscription(ctx context.Context, phoneNum, productName string) (*ResponseModel, error) {
+
+	path := subscriptionPath("/api/Subscription/RemoveSubscription", phoneNum, productName, nil)
+	var out ResponseModel
+	if err := c.do(ctx, path, &out); err != nil {
+		return nil, fmt.Errorf("remove subscription: %w", err)
+	}
+	return &out, nil
+
+}
+
 func (c *Client) do(ctx context.Context, path string, out interface{}) error {
 	token, err := c.auth.get(ctx, c.http, c.baseURL)
 	if err != nil {

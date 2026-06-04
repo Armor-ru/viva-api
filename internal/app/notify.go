@@ -4,21 +4,42 @@ import (
 	"fmt"
 	"strings"
 
+	"git.dev.armlab.pro/armor/sds-go/pkg/errs"
+	"git.dev.armlab.pro/armor/sds-go/pkg/logger"
 	"git.dev.armlab.pro/armor/sds-go/pkg/types"
 )
 
 func (s *Viva) notify(phone, text string) error {
 	if s.ussdTransport == nil {
-		return fmt.Errorf("ussdTransport is not configured")
+		return errs.WrapWithFields(
+			fmt.Errorf("ussdTransport is not configured"),
+			nil,
+		)
 	}
+
 	phone = strings.TrimSpace(strings.TrimPrefix(phone, "+"))
 	text = strings.TrimSpace(text)
 	if phone == "" || text == "" {
-		return fmt.Errorf("phone and text are required")
+		return errs.WrapWithFields(
+			fmt.Errorf("phone or text is empty"),
+			map[string]interface{}{"phone": phone, "text": text},
+		)
 	}
+
 	_, err := s.ussdTransport.Send("", map[string]interface{}{
 		"to":   phone,
 		"text": text,
 	}, types.SendOptions{})
-	return err
+	if err != nil {
+		return errs.WrapWithFields(
+			fmt.Errorf("ussd transport send failed %w", err),
+			map[string]interface{}{"phone": phone, "text": text},
+		)
+	}
+
+	logger.Info().
+		Str("phone", phone).
+		Int("textLen", len(text)).
+		Msg("smpp mt sent")
+	return nil
 }

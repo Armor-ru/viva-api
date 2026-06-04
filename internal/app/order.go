@@ -1,14 +1,12 @@
 package viva_api
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
-	"text/template"
 	"time"
 
-	"git.dev.armlab.pro/armor/sds-go/pkg/tplext"
+	"git.dev.armlab.pro/armor/sds-go/pkg/errs"
 	"git.dev.armlab.pro/armor/sds-go/pkg/types"
 	"github.com/google/uuid"
 	"github.com/spf13/cast"
@@ -25,27 +23,43 @@ func (s *Viva) getOrderId(phone, productCode string) string {
 
 func (s *Viva) getOrder(id string) (Order, error) {
 	if s.intTransport == nil {
-		return Order{}, fmt.Errorf("intTransport is not configured")
+		return Order{}, errs.WrapWithFields(
+			fmt.Errorf("intTransport is not configured"),
+			map[string]interface{}{"orderId": id},
+		)
 	}
+
 	id = strings.TrimSpace(id)
 	if id == "" {
-		return Order{}, fmt.Errorf("order id is required")
+		return Order{}, errs.WrapWithFields(
+			fmt.Errorf("order id is required"),
+			map[string]interface{}{"orderId": id},
+		)
 	}
 
 	raw, err := s.intTransport.Send("order/get", types.GetOrderRequest{ID: id}, types.SendOptions{
 		Timeout: 3 * time.Second,
 	})
 	if err != nil {
-		return Order{}, fmt.Errorf("send order/get: %w", err)
+		return Order{}, errs.WrapWithFields(
+			fmt.Errorf("send order/get failed %w", err),
+			map[string]interface{}{"orderId": id},
+		)
 	}
 
 	var order Order
 	data, err := json.Marshal(raw)
 	if err != nil {
-		return Order{}, err
+		return Order{}, errs.WrapWithFields(
+			fmt.Errorf("marshal order/get response failed %w", err),
+			map[string]interface{}{"orderId": id},
+		)
 	}
 	if err := json.Unmarshal(data, &order); err != nil {
-		return Order{}, fmt.Errorf("decode order/get response: %w", err)
+		return Order{}, errs.WrapWithFields(
+			fmt.Errorf("unmarshal order/get response failed %w", err),
+			map[string]interface{}{"orderId": id},
+		)
 	}
 	return order, nil
 }
@@ -62,18 +76,24 @@ func (s *Viva) isActiveOrder(order Order) bool {
 
 func (s *Viva) createOrder(orderType types.OrderType, phoneNum, productCode, lang string) error {
 	if s.intTransport == nil {
-		return fmt.Errorf("intTransport is not configured")
+		return errs.WrapWithFields(
+			fmt.Errorf("intTransport is not configured"),
+			map[string]interface{}{"phoneNum": phoneNum, "productCode": productCode},
+		)
 	}
 
 	phoneNum = strings.TrimSpace(phoneNum)
 	productCode = strings.TrimSpace(productCode)
 	if phoneNum == "" || productCode == "" {
-		return fmt.Errorf("phoneNum and productCode are required")
+		return errs.WrapWithFields(
+			fmt.Errorf("phoneNum and productCode are required"),
+			map[string]interface{}{"phoneNum": phoneNum, "productCode": productCode},
+		)
 	}
 
 	lang = strings.TrimSpace(lang)
-	if lang == "" && s.langStore != nil {
-		lang = strings.TrimSpace(s.langStore[phoneNum])
+	if lang == "" {
+		lang = s.storedLang(phoneNum)
 	}
 
 	req := types.OrderCreateRequest{
@@ -96,7 +116,15 @@ func (s *Viva) createOrder(orderType types.OrderType, phoneNum, productCode, lan
 
 	_, err := s.intTransport.Send("order/create", req, types.SendOptions{Timeout: 3 * time.Second})
 	if err != nil {
-		return fmt.Errorf("send order/create: %w", err)
+		return errs.WrapWithFields(
+			fmt.Errorf("send order/create failed %w", err),
+			map[string]interface{}{
+				"orderId":     req.ID,
+				"phoneNum":    phoneNum,
+				"productCode": productCode,
+				"orderType":   orderType,
+			},
+		)
 	}
 	return nil
 }
@@ -106,7 +134,10 @@ func (s *Viva) completeOrder(order Order) error {
 		return nil
 	}
 	if len(order.Items) == 0 {
-		return fmt.Errorf("order items is empty")
+		return errs.WrapWithFields(
+			fmt.Errorf("order items is empty"),
+			map[string]interface{}{"orderId": order.ID},
+		)
 	}
 
 	item := order.Items[0]
@@ -122,7 +153,10 @@ func (s *Viva) completeOrder(order Order) error {
 
 	code := strings.TrimSpace(cast.ToString(item.Artifacts["ActivationCode"]))
 	if code == "" {
-		return fmt.Errorf("ActivationCode is empty")
+		return errs.WrapWithFields(
+			fmt.Errorf("activation code is empty"),
+			map[string]interface{}{"orderId": order.ID, "itemId": item.ID},
+		)
 	}
 
 	rawDownload, _ := item.Artifacts["download"].([]interface{})
@@ -137,27 +171,76 @@ func (s *Viva) completeOrder(order Order) error {
 		}
 	}
 	if downloadURL == "" {
-		return fmt.Errorf("download url not found")
+		return errs.WrapWithFields(
+			fmt.Errorf("download url not found"),
+			map[string]interface{}{"orderId": order.ID, "itemId": item.ID},
+		)
 	}
 
 	phone := strings.TrimSpace(cast.ToString(order.Fields["phone"]))
 	if phone == "" {
-		return fmt.Errorf("order has no phone")
+		return errs.WrapWithFields(
+			fmt.Errorf("order has no phone"),
+			map[string]interface{}{"orderId": order.ID},
+		)
 	}
 
-	smsData := SmsData{
-		ProductName:    cast.ToString(item.Product.Name),
-		Quantity:       cast.ToInt(item.Options["quantity"]),
-		ActivationCode: code,
-		DownloadURL:    downloadURL,
+	productCode := productCodeFromOrder(order, item)
+	product, err := s.catalog.GetProductByExternalId(productCode)
+	if err != nil {
+		return err
 	}
 
-	var buf bytes.Buffer
-	tpl, _ := template.New("sms").Funcs(tplext.Funcs).Parse(
-		"{{.ProductName}}\nActivation code: {{.ActivationCode}}\nDownload link: {{.DownloadURL}}",
-	)
-	if err := tpl.Execute(&buf, smsData); err != nil {
-		return fmt.Errorf("render sms template: %w", err)
+	lang := strings.TrimSpace(cast.ToString(order.CustomData["lang"]))
+	if lang == "" {
+		lang = s.storedLang(phone)
 	}
-	return s.notify(phone, buf.String())
+	if lang == "" {
+		lang = "ru"
+	}
+
+	data := map[string]interface{}{
+		"Phone":          phone,
+		"ExternalID":     productCode,
+		"ProductName":    cast.ToString(item.Product.Name),
+		"Quantity":       cast.ToInt(item.Options["quantity"]),
+		"ActivationCode": code,
+		"DownloadURL":    downloadURL,
+		"Link":           downloadURL,
+		"Language":       lang,
+	}
+
+	if text := product.GetNotify("welcome_trial", data, lang); text != "" {
+		if err := s.notify(phone, text); err != nil {
+			return err
+		}
+	}
+
+	text := product.GetNotify("license", data, lang)
+	if text == "" {
+		return errs.WrapWithFields(
+			fmt.Errorf("license notification template is empty"),
+			map[string]interface{}{
+				"orderId":     order.ID,
+				"productCode": productCode,
+				"lang":        lang,
+			},
+		)
+	}
+
+	return s.notify(phone, text)
+}
+
+func productCodeFromOrder(order Order, item types.OrderItemResponse) string {
+	if order.CustomData != nil {
+		if code := strings.TrimSpace(cast.ToString(order.CustomData["productCode"])); code != "" {
+			return code
+		}
+	}
+	if len(item.Tariff.ExternalID) > 0 {
+		if code := strings.TrimSpace(item.Tariff.ExternalID[0]); code != "" {
+			return code
+		}
+	}
+	return strings.TrimSpace(item.Tariff.VendorCode)
 }
