@@ -51,7 +51,7 @@ func (s *Viva) InitHandlers() {
 
 	if s.intTransport != nil {
 		s.intTransport.Subscribe("order/completed", s.orderCompleteHandler)
-		s.intTransport.Subscribe(s.accountId+".order/expires", s.orderExpiresHandler)
+		s.intTransport.Subscribe("order/expires", s.orderExpiresHandler)
 	}
 
 	if s.ussdTransport != nil {
