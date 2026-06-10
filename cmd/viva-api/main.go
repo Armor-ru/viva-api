@@ -3,12 +3,15 @@ package main
 import (
 	"flag"
 	"strings"
+	"time"
 
 	"git.dev.armlab.pro/armor/sds-go/pkg/config"
 	"git.dev.armlab.pro/armor/sds-go/pkg/logger"
 	"git.dev.armlab.pro/armor/sds-go/pkg/systemd"
 	utilsTls "git.dev.armlab.pro/armor/sds-go/pkg/tls"
 	"git.dev.armlab.pro/armor/sds-go/pkg/transport"
+	transportSmpp "git.dev.armlab.pro/armor/sds-go/pkg/transport/smpp"
+	"git.dev.armlab.pro/armor/sds-go/pkg/types"
 
 	viva_api "git.dev.armlab.pro/armor/viva-api/internal/app"
 	"git.dev.armlab.pro/armor/viva-api/internal/vivaclient"
@@ -24,10 +27,24 @@ type Conf struct {
 		Secret []string `yaml:"secret"`
 	} `yaml:"extTransport"`
 
-	SMPP        viva_api.SmppConfig `yaml:"smpp"`
-	TestTariffs []string            `yaml:"testTariffs"`
-	Channels    viva_api.Channels   `yaml:"channels"`
-	AccountId   string              `yaml:"accountId"`
+	SMPP struct {
+		Endpoint []string `yaml:"endpoint"`
+		Auth     struct {
+			User     string `yaml:"user"`
+			Password string `yaml:"password"`
+		} `yaml:"auth"`
+		Address struct {
+			SourceAddr    string `yaml:"sourceAddr"`
+			SourceAddrTON uint8  `yaml:"sourceAddrTON"`
+			SourceAddrNPI uint8  `yaml:"sourceAddrNPI"`
+			DestAddrTON   uint8  `yaml:"destAddrTON"`
+			DestAddrNPI   uint8  `yaml:"destAddrNPI"`
+		} `yaml:"address"`
+		RespTimeout time.Duration `yaml:"respTimeout"`
+	} `yaml:"smpp"`
+	CatalogDir        string `yaml:"catalogDir"`
+	AccountId         string `yaml:"accountId"`
+	LandingConfirmURL string `yaml:"landingConfirmURL"`
 
 	VivaAPI struct {
 		BaseURL  string `yaml:"baseURL"`
@@ -66,7 +83,33 @@ func main() {
 		Server: cfg.ExtTransport.Server,
 	})
 	defer http.Disconnect()
-	http.Connect()
+
+	smppRespTimeout := cfg.SMPP.RespTimeout
+	if smppRespTimeout <= 0 {
+		smppRespTimeout = 10 * time.Second
+	}
+
+	smpp := transportSmpp.NewTransport(transportSmpp.Config{
+		Name:      ServiceName,
+		Endpoints: cfg.SMPP.Endpoint,
+		User:      cfg.SMPP.Auth.User,
+		Passwd:    cfg.SMPP.Auth.Password,
+		Address: transportSmpp.AddressConfig{
+			SourceAddr:    cfg.SMPP.Address.SourceAddr,
+			SourceAddrTON: cfg.SMPP.Address.SourceAddrTON,
+			SourceAddrNPI: cfg.SMPP.Address.SourceAddrNPI,
+			DestAddrTON:   cfg.SMPP.Address.DestAddrTON,
+			DestAddrNPI:   cfg.SMPP.Address.DestAddrNPI,
+		},
+		RespTimeout: smppRespTimeout,
+	})
+	defer smpp.Disconnect()
+
+	if tr, ok := smpp.(*transportSmpp.Transport); ok {
+		tr.Error(func(err error, _ types.HandlerContext) {
+			logger.Error().Err(err).Msg("smpp inbound handler failed")
+		})
+	}
 
 	var client *vivaclient.Client
 	if strings.TrimSpace(cfg.VivaAPI.BaseURL) != "" {
@@ -80,11 +123,22 @@ func main() {
 	viva_api.New(
 		viva_api.WithIntTransport(nats),
 		viva_api.WithExtTransport(http),
+		viva_api.WithUssdTransport(smpp),
 		viva_api.WithSecrets(cfg.ExtTransport.Secret),
-		viva_api.WithSmppConfig(cfg.SMPP),
+		viva_api.WithCatalogDir(cfg.CatalogDir),
 		viva_api.WithAccountId(cfg.AccountId),
 		viva_api.WithVivaClient(client),
+		viva_api.WithLandingConfirmURL(cfg.LandingConfirmURL),
 	)
+	if err := http.Connect(); err != nil {
+		logger.Error().Err(err).Msg("http connect failed")
+	}
 
-	nats.ConnectAndWait()
+	if err := smpp.Connect(); err != nil {
+		logger.Error().Err(err).Msg("smpp connect failed")
+	}
+
+	if err := nats.ConnectAndWait(); err != nil {
+		logger.Fatal().Err(err).Msg("nats connect failed")
+	}
 }
