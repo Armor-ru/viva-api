@@ -40,6 +40,7 @@ type Conf struct {
 			DestAddrTON   uint8  `yaml:"destAddrTON"`
 			DestAddrNPI   uint8  `yaml:"destAddrNPI"`
 		} `yaml:"address"`
+		RespTimeout time.Duration `yaml:"respTimeout"`
 	} `yaml:"smpp"`
 	CatalogDir        string `yaml:"catalogDir"`
 	AccountId         string `yaml:"accountId"`
@@ -83,6 +84,11 @@ func main() {
 	})
 	defer http.Disconnect()
 
+	smppRespTimeout := cfg.SMPP.RespTimeout
+	if smppRespTimeout <= 0 {
+		smppRespTimeout = 10 * time.Second
+	}
+
 	smpp := transportSmpp.NewTransport(transportSmpp.Config{
 		Name:      ServiceName,
 		Endpoints: cfg.SMPP.Endpoint,
@@ -95,7 +101,7 @@ func main() {
 			DestAddrTON:   cfg.SMPP.Address.DestAddrTON,
 			DestAddrNPI:   cfg.SMPP.Address.DestAddrNPI,
 		},
-		RespTimeout: 5 * time.Second,
+		RespTimeout: smppRespTimeout,
 	})
 	defer smpp.Disconnect()
 
@@ -132,5 +138,7 @@ func main() {
 		logger.Error().Err(err).Msg("smpp connect failed")
 	}
 
-	nats.ConnectAndWait()
+	if err := nats.ConnectAndWait(); err != nil {
+		logger.Fatal().Err(err).Msg("nats connect failed")
+	}
 }

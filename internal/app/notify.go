@@ -40,8 +40,25 @@ func (s *Viva) notify(phone, text string) error {
 	logger.Info().
 		Str("phone", phone).
 		Int("textLen", len(text)).
+		Str("text", text).
 		Msg("smpp mt sent")
 	return nil
+}
+
+func (s *Viva) sendServiceDeactivated(phone, productCode string) error {
+	product, err := s.catalog.GetProductByExternalId(productCode)
+	if err != nil {
+		return err
+	}
+	lang := s.GetLang(phone)
+	if lang == "" {
+		lang = "ru"
+	}
+	return s.sendProductNotify(product, phone, "service_deactivated", map[string]interface{}{
+		"Phone":       phone,
+		"ShortNumber": product.ShortNumber,
+		"ExternalID":  product.ExternalId,
+	}, lang)
 }
 
 func (s *Viva) sendProductNotify(product *Product, phone, key string, data map[string]interface{}, lang string) error {

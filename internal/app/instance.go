@@ -72,7 +72,7 @@ func (s *Viva) ussdHandler(ctx types.HandlerContext) {
 		Str("shortNumber", req.ShortNumber).
 		Str("text", req.Text).
 		Msg("smpp mo received")
-	s.ussd(req)
+	go s.ussd(req)
 }
 
 func (s *Viva) orderCompleteHandler(ctx types.HandlerContext) {
@@ -102,6 +102,12 @@ func (s *Viva) webhookHandler(ctx types.HandlerContext, orderType types.OrderTyp
 	if err := s.createOrder(orderType, req.PhoneNum, req.ProductCode, ""); err != nil {
 		logAppError(err, "create order failed")
 		return
+	}
+
+	if orderType == types.OrderTypeCancel {
+		if err := s.sendServiceDeactivated(req.PhoneNum, req.ProductCode); err != nil {
+			logAppError(err, "notify failed")
+		}
 	}
 
 	_ = ctx.Response("")

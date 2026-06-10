@@ -91,11 +91,17 @@ func (c *Client) do(ctx context.Context, path string, out interface{}) error {
 	if err != nil {
 		return fmt.Errorf("read response: %w", err)
 	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("viva %s: status %d: %s", path, resp.StatusCode, string(raw))
-	}
 	if err := json.Unmarshal(raw, out); err != nil {
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return fmt.Errorf("viva %s: status %d: %s", path, resp.StatusCode, string(raw))
+		}
 		return fmt.Errorf("unmarshal response: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		if rm, ok := out.(*ResponseModel); ok && rm.ResultCode != 0 {
+			return nil
+		}
+		return fmt.Errorf("viva %s: status %d: %s", path, resp.StatusCode, string(raw))
 	}
 	return nil
 }
