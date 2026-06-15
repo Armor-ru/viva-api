@@ -49,6 +49,7 @@ func (s *Viva) ussd(req UssdRequest) {
 		}); err != nil {
 			if fields := errs.Fields(err); fields != nil {
 				if cast.ToInt(fields["resultCode"]) == 7 {
+					logUssdInitDone(req.Phone, product.ExternalId, 7, "already_active")
 					if err := s.sendProductNotify(product, req.Phone, "already_active", data, lang); err != nil {
 						logAppError(err, "notify failed")
 					}
@@ -67,7 +68,9 @@ func (s *Viva) ussd(req UssdRequest) {
 		data["LandingURL"] = landingURL
 		if err := s.sendProductNotify(product, req.Phone, "otp_landing", data, lang); err != nil {
 			logAppError(err, "notify failed")
+			return
 		}
+		logUssdInitDone(req.Phone, product.ExternalId, 0, "landing_sms")
 	case "STOP":
 		data := map[string]interface{}{
 			"Phone":       req.Phone,
@@ -76,6 +79,7 @@ func (s *Viva) ussd(req UssdRequest) {
 		}
 		order, err := s.getOrder(s.getOrderId(req.Phone, product.ExternalId))
 		if err != nil || !s.isActiveOrder(order) {
+			logUssdStopDone(req.Phone, product.ExternalId, "already_deactivated")
 			if err := s.sendProductNotify(product, req.Phone, "already_deactivated", data, lang); err != nil {
 				logAppError(err, "notify failed")
 			}
@@ -87,7 +91,9 @@ func (s *Viva) ussd(req UssdRequest) {
 		}
 		if err := s.sendProductNotify(product, req.Phone, "service_deactivated", data, lang); err != nil {
 			logAppError(err, "notify failed")
+			return
 		}
+		logUssdStopDone(req.Phone, product.ExternalId, "service_deactivated")
 	case "RUS", "ENG", "ARM":
 		switch req.Text {
 		case "RUS":
@@ -102,12 +108,16 @@ func (s *Viva) ussd(req UssdRequest) {
 			"Phone": req.Phone, "ShortNumber": req.ShortNumber, "Language": lang,
 		}, lang); err != nil {
 			logAppError(err, "notify failed")
+			return
 		}
+		logUssdLangDone(req.Phone, product.ExternalId, lang)
 	default:
 		if err := s.sendProductNotify(product, req.Phone, "unknown_command", map[string]interface{}{
 			"Phone": req.Phone, "ShortNumber": req.ShortNumber, "Text": req.Text,
 		}, lang); err != nil {
 			logAppError(err, "notify failed")
+			return
 		}
+		logUssdUnknownDone(req.Phone, product.ExternalId, req.Text, lang)
 	}
 }

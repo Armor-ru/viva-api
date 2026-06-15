@@ -159,12 +159,16 @@ func (s *Viva) expireOrder(order Order) error {
 	}
 
 	lang := orderNotifyLang(s, order, phone)
-	return s.sendProductNotify(product, phone, "trial_expires", map[string]interface{}{
+	if err := s.sendProductNotify(product, phone, "trial_expires", map[string]interface{}{
 		"Phone":      phone,
 		"ExternalID": productCode,
 		"Language":   lang,
 		"EndTime":    order.EndTime,
-	}, lang)
+	}, lang); err != nil {
+		return err
+	}
+	logOrderExpiresDone(order.ID, phone, productCode, *order.EndTime)
+	return nil
 }
 
 func (s *Viva) completeOrder(order Order) error {
@@ -237,7 +241,7 @@ func (s *Viva) completeOrder(order Order) error {
 	}
 
 	if text := product.GetNotify(welcomeKey, data, lang); text != "" {
-		if err := s.notify(phone, text); err != nil {
+		if err := s.notify(phone, text, welcomeKey); err != nil {
 			return err
 		}
 	}
@@ -254,7 +258,11 @@ func (s *Viva) completeOrder(order Order) error {
 		)
 	}
 
-	return s.notify(phone, text)
+	if err := s.notify(phone, text, "license"); err != nil {
+		return err
+	}
+	logOrderCompleteDone(order.ID, phone, productCode, item.Type, welcomeKey)
+	return nil
 }
 
 func completionNotifyItem(order Order) (types.OrderItemResponse, string, bool) {
