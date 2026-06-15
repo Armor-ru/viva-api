@@ -3,8 +3,8 @@ module git.dev.armlab.pro/armor/viva-api
 go 1.26.1
 
 require (
-	git.dev.armlab.pro/armor/sds-go v1.1.0
-	github.com/fiorix/go-smpp v0.0.0-20210403173735-2894b96e70ba
+	git.dev.armlab.pro/armor/sds-go v1.1.4
+	github.com/go-playground/validator/v10 v10.12.0
 	github.com/gofiber/fiber/v2 v2.43.0
 	github.com/google/uuid v1.6.0
 	github.com/spf13/cast v1.5.0
@@ -18,10 +18,10 @@ require (
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/eko/gocache/lib/v4 v4.1.3 // indirect
 	github.com/eko/gocache/store/ristretto/v4 v4.1.2 // indirect
+	github.com/fiorix/go-smpp v0.0.0-20210403173735-2894b96e70ba // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/go-playground/validator/v10 v10.12.0 // indirect
 	github.com/golang/glog v1.0.0 // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
@@ -69,5 +69,3 @@ require (
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace git.dev.armlab.pro/armor/sds-go => ../sds-go
