@@ -56,7 +56,7 @@ func (s *Viva) InitHandlers() {
 
 	if s.ussdTransport != nil {
 		if _, err := s.ussdTransport.Subscribe("smpp/inbound", s.ussdHandler); err != nil {
-			logger.Error().Str("error", err.Error()).Msg("smpp inbound subscribe failed")
+			logger.Error().Msg("smpp inbound subscribe failed, " + err.Error())
 		}
 	}
 }

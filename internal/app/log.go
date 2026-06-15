@@ -11,7 +11,11 @@ func logAppError(err error, msg string) {
 	if err == nil {
 		return
 	}
-	logger.Error().Fields(errs.Fields(err)).Msg(msg)
+	if fields := errs.Fields(err); fields != nil {
+		logger.Error().Fields(fields).Msg(msg)
+		return
+	}
+	logger.Error().Msg(msg + ", " + err.Error())
 }
 
 func logUssdInitDone(phone, product string, resultCode int, next string) {
