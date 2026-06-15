@@ -9,7 +9,7 @@ import (
 	"git.dev.armlab.pro/armor/sds-go/pkg/types"
 )
 
-func (s *Viva) notify(phone, text string) error {
+func (s *Viva) notify(phone, text, notifyKey string) error {
 	if s.ussdTransport == nil {
 		return errs.WrapWithFields(
 			fmt.Errorf("ussdTransport is not configured"),
@@ -37,11 +37,14 @@ func (s *Viva) notify(phone, text string) error {
 		)
 	}
 
-	logger.Info().
+	log := logger.Info().
 		Str("phone", phone).
 		Int("textLen", len(text)).
-		Str("text", text).
-		Msg("smpp mt sent")
+		Str("text", text)
+	if notifyKey != "" {
+		log = log.Str("notify", notifyKey)
+	}
+	log.Msg("smpp mt sent")
 	return nil
 }
 
@@ -73,5 +76,5 @@ func (s *Viva) sendProductNotify(product *Product, phone, key string, data map[s
 			},
 		)
 	}
-	return s.notify(phone, text)
+	return s.notify(phone, text, key)
 }

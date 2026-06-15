@@ -93,6 +93,7 @@ func (s *Viva) landingConfirmHandler(ctx types.HandlerContext) {
 		return
 	}
 
+	logLandingConfirmDone(req.PhoneNum, orderID)
 	_ = ctx.Response(map[string]interface{}{"confirm": res, "orderId": orderID})
 }
 

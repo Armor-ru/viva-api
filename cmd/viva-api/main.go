@@ -107,7 +107,7 @@ func main() {
 
 	if tr, ok := smpp.(*transportSmpp.Transport); ok {
 		tr.Error(func(err error, _ types.HandlerContext) {
-			logger.Error().Err(err).Msg("smpp inbound handler failed")
+			logger.Error().Msg("smpp inbound handler failed, " + err.Error())
 		})
 	}
 
@@ -131,14 +131,14 @@ func main() {
 		viva_api.WithLandingConfirmURL(cfg.LandingConfirmURL),
 	)
 	if err := http.Connect(); err != nil {
-		logger.Error().Err(err).Msg("http connect failed")
+		logger.Error().Msg("http connect failed, " + err.Error())
 	}
 
 	if err := smpp.Connect(); err != nil {
-		logger.Error().Err(err).Msg("smpp connect failed")
+		logger.Error().Msg("smpp connect failed, " + err.Error())
 	}
 
 	if err := nats.ConnectAndWait(); err != nil {
-		logger.Fatal().Err(err).Msg("nats connect failed")
+		logger.Fatal().Msg("nats connect failed, " + err.Error())
 	}
 }

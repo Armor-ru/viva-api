@@ -29,7 +29,7 @@ type Viva struct {
 func (s *Viva) InitHandlers() {
 	if s.catalogDir != "" {
 		if err := s.catalog.Load(s.catalogDir); err != nil {
-			logger.Fatal().Fields(errs.Fields(err)).Err(err).Msg("catalog load failed")
+			logger.Fatal().Fields(errs.Fields(err)).Msg("catalog load failed")
 		}
 	}
 
@@ -56,7 +56,7 @@ func (s *Viva) InitHandlers() {
 
 	if s.ussdTransport != nil {
 		if _, err := s.ussdTransport.Subscribe("smpp/inbound", s.ussdHandler); err != nil {
-			logger.Error().Err(err).Msg("smpp inbound subscribe failed")
+			logger.Error().Msg("smpp inbound subscribe failed, " + err.Error())
 		}
 	}
 }
@@ -104,10 +104,17 @@ func (s *Viva) webhookHandler(ctx types.HandlerContext, orderType types.OrderTyp
 		return
 	}
 
+	if orderType == types.OrderTypeRenew {
+		logWebhookRenewDone(req.PhoneNum, req.ProductCode, s.getOrderId(req.PhoneNum, req.ProductCode))
+	}
+
 	if orderType == types.OrderTypeCancel {
+		orderID := s.getOrderId(req.PhoneNum, req.ProductCode)
 		if err := s.sendServiceDeactivated(req.PhoneNum, req.ProductCode); err != nil {
 			logAppError(err, "notify failed")
+			return
 		}
+		logWebhookRemoveDone(req.PhoneNum, req.ProductCode, orderID)
 	}
 
 	_ = ctx.Response("")
