@@ -32,7 +32,7 @@ func (s *Viva) notify(phone, text, notifyKey string) error {
 	}, types.SendOptions{})
 	if err != nil {
 		return errs.WrapWithFields(
-			fmt.Errorf("ussd transport send failed %w", err),
+			fmt.Errorf("ussd transport send failed, %w", err),
 			map[string]interface{}{"phone": phone, "text": text},
 		)
 	}

@@ -42,7 +42,7 @@ func (s *Viva) getOrder(id string) (Order, error) {
 	})
 	if err != nil {
 		return Order{}, errs.WrapWithFields(
-			fmt.Errorf("send order/get failed %w", err),
+			fmt.Errorf("send order/get failed, %w", err),
 			map[string]interface{}{"orderId": id},
 		)
 	}
@@ -51,13 +51,13 @@ func (s *Viva) getOrder(id string) (Order, error) {
 	data, err := json.Marshal(raw)
 	if err != nil {
 		return Order{}, errs.WrapWithFields(
-			fmt.Errorf("marshal order/get response failed %w", err),
+			fmt.Errorf("marshal order/get response failed, %w", err),
 			map[string]interface{}{"orderId": id},
 		)
 	}
 	if err := json.Unmarshal(data, &order); err != nil {
 		return Order{}, errs.WrapWithFields(
-			fmt.Errorf("unmarshal order/get response failed %w", err),
+			fmt.Errorf("unmarshal order/get response failed, %w", err),
 			map[string]interface{}{"orderId": id},
 		)
 	}
@@ -117,7 +117,7 @@ func (s *Viva) createOrder(orderType types.OrderType, phoneNum, productCode, lan
 	_, err := s.intTransport.Send("order/create", req, types.SendOptions{Timeout: 3 * time.Second})
 	if err != nil {
 		return errs.WrapWithFields(
-			fmt.Errorf("send order/create failed %w", err),
+			fmt.Errorf("send order/create failed, %w", err),
 			map[string]interface{}{
 				"orderId":     req.ID,
 				"phoneNum":    phoneNum,

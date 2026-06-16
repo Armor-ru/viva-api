@@ -16,7 +16,7 @@ func (s *Viva) buildLandingConfirmURL(base, phone string) (string, error) {
 	}
 	u, err := url.Parse(base)
 	if err != nil {
-		return "", fmt.Errorf("landing confirm url %w", err)
+		return "", fmt.Errorf("landing confirm url failed, %w", err)
 	}
 	q := u.Query()
 	q.Set("phone", strings.TrimPrefix(strings.TrimSpace(phone), "+"))

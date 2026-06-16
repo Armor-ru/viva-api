@@ -59,6 +59,22 @@ func logLandingConfirmDone(phone, orderID string) {
 		Msg("landing confirm done")
 }
 
+func logLandingInitReceived(phone, product string) {
+	logger.Info().
+		Str("phone", phone).
+		Str("product", product).
+		Msg("landing init received")
+}
+
+func logLandingConfirmReceived(phone, productName string, hasOTP, hasProductCode bool) {
+	logger.Info().
+		Str("phone", phone).
+		Str("productName", productName).
+		Bool("hasOtp", hasOTP).
+		Bool("hasProductCode", hasProductCode).
+		Msg("landing confirm received")
+}
+
 func logOrderExpiresDone(orderID, phone, product string, endTime time.Time) {
 	logger.Info().
 		Str("orderId", orderID).

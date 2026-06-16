@@ -75,7 +75,7 @@ func (c *Catalog) Load(dir string) error {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return errs.WrapWithFields(
-			fmt.Errorf("read catalog directory %w", err),
+			fmt.Errorf("read catalog directory failed, %w", err),
 			map[string]interface{}{"dir": dir},
 		)
 	}
@@ -92,7 +92,7 @@ func (c *Catalog) Load(dir string) error {
 		raw, err := os.ReadFile(path)
 		if err != nil {
 			return errs.WrapWithFields(
-				fmt.Errorf("read catalog file %w", err),
+				fmt.Errorf("read catalog file failed, %w", err),
 				map[string]interface{}{"path": path},
 			)
 		}
@@ -100,7 +100,7 @@ func (c *Catalog) Load(dir string) error {
 		var item Product
 		if err := json.Unmarshal(raw, &item); err != nil {
 			return errs.WrapWithFields(
-				fmt.Errorf("decode catalog file %w", err),
+				fmt.Errorf("decode catalog file failed, %w", err),
 				map[string]interface{}{"path": path},
 			)
 		}

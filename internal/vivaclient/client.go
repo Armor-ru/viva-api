@@ -40,7 +40,7 @@ func (c *Client) InitSubscription(ctx context.Context, phoneNum, productName str
 
 	var out ResponseModel
 	if err := c.do(ctx, path, &out); err != nil {
-		return nil, fmt.Errorf("init subscription: %w", err)
+		return nil, fmt.Errorf("init subscription failed, %w", err)
 	}
 
 	return &out, nil
@@ -51,7 +51,7 @@ func (c *Client) ConfirmSubscription(ctx context.Context, phoneNum, productName 
 
 	var out ResponseModel
 	if err := c.do(ctx, path, &out); err != nil {
-		return nil, fmt.Errorf("confirm subscription: %w", err)
+		return nil, fmt.Errorf("confirm subscription failed, %w", err)
 	}
 
 	return &out, nil
@@ -62,7 +62,7 @@ func (c *Client) RemoveSubscription(ctx context.Context, phoneNum, productName s
 	path := subscriptionPath("/api/Subscription/RemoveSubscription", phoneNum, productName, nil)
 	var out ResponseModel
 	if err := c.do(ctx, path, &out); err != nil {
-		return nil, fmt.Errorf("remove subscription: %w", err)
+		return nil, fmt.Errorf("remove subscription failed, %w", err)
 	}
 	return &out, nil
 
@@ -71,37 +71,37 @@ func (c *Client) RemoveSubscription(ctx context.Context, phoneNum, productName s
 func (c *Client) do(ctx context.Context, path string, out interface{}) error {
 	token, err := c.auth.get(ctx, c.http, c.baseURL)
 	if err != nil {
-		return fmt.Errorf("get auth token: %w", err)
+		return fmt.Errorf("get auth token failed, %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, nil)
 	if err != nil {
-		return fmt.Errorf("create request: %w", err)
+		return fmt.Errorf("create request failed, %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return fmt.Errorf("execute request: %w", err)
+		return fmt.Errorf("execute request failed, %w", err)
 	}
 	defer resp.Body.Close()
 
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("read response: %w", err)
+		return fmt.Errorf("read response failed, %w", err)
 	}
 	if err := json.Unmarshal(raw, out); err != nil {
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			return fmt.Errorf("viva %s: status %d: %s", path, resp.StatusCode, string(raw))
+			return fmt.Errorf("viva %s, status %d, %s", path, resp.StatusCode, string(raw))
 		}
-		return fmt.Errorf("unmarshal response: %w", err)
+		return fmt.Errorf("unmarshal response failed, %w", err)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		if rm, ok := out.(*ResponseModel); ok && rm.ResultCode != 0 {
 			return nil
 		}
-		return fmt.Errorf("viva %s: status %d: %s", path, resp.StatusCode, string(raw))
+		return fmt.Errorf("viva %s, status %d, %s", path, resp.StatusCode, string(raw))
 	}
 	return nil
 }
@@ -154,35 +154,35 @@ func (tm *tokenManager) fetch(ctx context.Context, client *http.Client, baseURL 
 		"password": tm.password,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("marshal auth body: %w", err)
+		return nil, fmt.Errorf("marshal auth body failed, %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/auth/token", bytes.NewReader(body))
 	if err != nil {
-		return nil, fmt.Errorf("create auth request: %w", err)
+		return nil, fmt.Errorf("create auth request failed, %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("execute auth request: %w", err)
+		return nil, fmt.Errorf("execute auth request failed, %w", err)
 	}
 	defer resp.Body.Close()
 
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, fmt.Errorf("read auth response: %w", err)
+		return nil, fmt.Errorf("read auth response failed, %w", err)
 	}
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("viva auth: status %d: %s", resp.StatusCode, string(raw))
+		return nil, fmt.Errorf("viva auth, status %d, %s", resp.StatusCode, string(raw))
 	}
 
 	var tr tokenResponse
 	if err := json.Unmarshal(raw, &tr); err != nil {
-		return nil, fmt.Errorf("unmarshal token response: %w", err)
+		return nil, fmt.Errorf("unmarshal token response failed, %w", err)
 	}
 	if tr.AccessToken == "" {
-		return nil, fmt.Errorf("viva auth: empty access_token")
+		return nil, fmt.Errorf("viva auth, empty access_token")
 	}
 	return &tr, nil
 }

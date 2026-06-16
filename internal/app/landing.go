@@ -2,11 +2,13 @@ package viva_api
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"git.dev.armlab.pro/armor/sds-go/pkg/errs"
+	"git.dev.armlab.pro/armor/sds-go/pkg/logger"
 	httpTransport "git.dev.armlab.pro/armor/sds-go/pkg/transport/http"
 	"git.dev.armlab.pro/armor/sds-go/pkg/types"
 	"git.dev.armlab.pro/armor/viva-api/internal/vivaclient"
@@ -34,6 +36,7 @@ type SubscriptionConfirm struct {
 func (s *Viva) landingInitHandler(ctx types.HandlerContext) {
 	var req SubscriptionInitRequest
 	ctx.Data(&req)
+	logLandingInitReceived(req.PhoneNum, req.ProductName)
 
 	if err := validate.Struct(req); err != nil {
 		landingErr(ctx, 400, errs.WrapWithFields(
@@ -65,6 +68,12 @@ func (s *Viva) landingInitHandler(ctx types.HandlerContext) {
 func (s *Viva) landingConfirmHandler(ctx types.HandlerContext) {
 	var req SubscriptionConfirm
 	ctx.Data(&req)
+	logLandingConfirmReceived(
+		req.PhoneNum,
+		req.ProductName,
+		strings.TrimSpace(req.OTP) != "",
+		strings.TrimSpace(req.ProductCode) != "",
+	)
 
 	if err := validate.Struct(req); err != nil {
 		landingErr(ctx, 400, errs.WrapWithFields(
@@ -99,6 +108,11 @@ func (s *Viva) landingInit(req SubscriptionInitRequest) (*vivaclient.ResponseMod
 		return nil, fmt.Errorf("viva api not configured")
 	}
 
+	logger.Info().
+		Str("phone", req.PhoneNum).
+		Str("product", req.ProductName).
+		Msg("viva init subscription request")
+
 	c, cancel := context.WithTimeout(context.Background(), vivaRequestTimeout)
 	defer cancel()
 
@@ -107,22 +121,31 @@ func (s *Viva) landingInit(req SubscriptionInitRequest) (*vivaclient.ResponseMod
 		return nil, errs.WrapWithFields(
 			err,
 			map[string]interface{}{
+				"step":    "init",
 				"phone":   req.PhoneNum,
 				"product": req.ProductName,
+				"path":    "/api/Subscription/InitSubscription",
 			},
 		)
 	}
 	if res.ResultCode != 0 {
 		return nil, errs.WrapWithFields(
-			fmt.Errorf("viva init subscription failed"),
+			vivaLandingErr(res.Message),
 			map[string]interface{}{
+				"step":       "init",
 				"phone":      req.PhoneNum,
 				"product":    req.ProductName,
 				"resultCode": res.ResultCode,
-				"message":    res.Message,
+				"path":       "/api/Subscription/InitSubscription",
 			},
 		)
 	}
+
+	logger.Info().
+		Str("phone", req.PhoneNum).
+		Str("product", req.ProductName).
+		Int("resultCode", res.ResultCode).
+		Msg("viva init subscription success")
 	return res, nil
 }
 
@@ -130,6 +153,12 @@ func (s *Viva) landingConfirm(req SubscriptionConfirm) (*vivaclient.ResponseMode
 	if s.vivaClient == nil {
 		return nil, "", fmt.Errorf("viva api not configured")
 	}
+
+	logger.Info().
+		Str("phone", req.PhoneNum).
+		Str("productName", req.ProductName).
+		Str("productCode", req.ProductCode).
+		Msg("viva confirm subscription request")
 
 	c, cancel := context.WithTimeout(context.Background(), vivaRequestTimeout)
 	defer cancel()
@@ -139,30 +168,85 @@ func (s *Viva) landingConfirm(req SubscriptionConfirm) (*vivaclient.ResponseMode
 		return nil, "", errs.WrapWithFields(
 			err,
 			map[string]interface{}{
-				"phone":   req.PhoneNum,
-				"product": req.ProductName,
+				"step":        "confirm",
+				"phone":       req.PhoneNum,
+				"product":     req.ProductName,
+				"productName": req.ProductName,
+				"productCode": req.ProductCode,
+				"path":        "/api/Subscription/ConfirmSubscription",
 			},
 		)
 	}
 	if res.ResultCode != 0 {
 		return nil, "", errs.WrapWithFields(
-			fmt.Errorf("viva subscription failed"),
+			vivaLandingErr(res.Message),
 			map[string]interface{}{
-				"phone":      req.PhoneNum,
-				"product":    req.ProductName,
-				"resultCode": res.ResultCode,
-				"message":    res.Message,
+				"step":        "confirm",
+				"phone":       req.PhoneNum,
+				"product":     req.ProductName,
+				"productName": req.ProductName,
+				"productCode": req.ProductCode,
+				"resultCode":  res.ResultCode,
+				"path":        "/api/Subscription/ConfirmSubscription",
 			},
 		)
 	}
 
+	logger.Info().
+		Str("phone", req.PhoneNum).
+		Str("productName", req.ProductName).
+		Int("resultCode", res.ResultCode).
+		Msg("viva confirm subscription success")
+
 	orderID := s.getOrderId(req.PhoneNum, req.ProductCode)
-	if err := s.createOrder(types.OrderTypeNew, req.PhoneNum, req.ProductCode, req.Lang); err != nil {
+	orderType := types.OrderTypeNew
+	order, err := s.getOrder(orderID)
+	switch {
+	case err == nil && strings.TrimSpace(order.ID) != "":
+		orderType = types.OrderTypeRenew
+	case err != nil && !strings.Contains(strings.ToLower(err.Error()), "order not found"):
 		return nil, "", errs.WrapWithFields(
 			err,
 			map[string]interface{}{
-				"phone":   req.PhoneNum,
-				"product": req.ProductCode,
+				"step":        "confirm",
+				"phone":       req.PhoneNum,
+				"product":     req.ProductCode,
+				"productName": req.ProductName,
+				"productCode": req.ProductCode,
+				"orderId":     orderID,
+				"path":        "order/get",
+			},
+		)
+	default:
+		orderType = types.OrderTypeNew
+	}
+
+	logger.Info().
+		Str("phone", req.PhoneNum).
+		Str("productCode", req.ProductCode).
+		Str("orderId", orderID).
+		Str("orderType", string(orderType)).
+		Msg("landing order type resolved")
+
+	logger.Info().
+		Str("phone", req.PhoneNum).
+		Str("productCode", req.ProductCode).
+		Str("orderId", orderID).
+		Str("orderType", string(orderType)).
+		Str("lang", req.Lang).
+		Msg("landing order create sent")
+	if err := s.createOrder(orderType, req.PhoneNum, req.ProductCode, req.Lang); err != nil {
+		return nil, "", errs.WrapWithFields(
+			err,
+			map[string]interface{}{
+				"step":        "confirm",
+				"phone":       req.PhoneNum,
+				"product":     req.ProductCode,
+				"productName": req.ProductName,
+				"productCode": req.ProductCode,
+				"orderId":     orderID,
+				"orderType":   orderType,
+				"path":        "order/create",
 			},
 		)
 	}
@@ -193,16 +277,45 @@ func landingPhone(ctx types.HandlerContext, bodyPhone string) (string, error) {
 }
 
 func landingErr(ctx types.HandlerContext, status int, err error, step, phone, product string) {
-	fields := map[string]interface{}{
-		"step":    step,
-		"phone":   phone,
-		"product": product,
+	clientErr := err.Error()
+	existing := errs.Fields(err)
+	wrap := map[string]interface{}{}
+	if existing == nil || existing["step"] == nil {
+		wrap["step"] = step
 	}
-	logAppError(errs.WrapWithFields(err, fields), "landing "+step+" failed")
+	if existing == nil || existing["phone"] == nil {
+		wrap["phone"] = phone
+	}
+	if existing == nil || (existing["product"] == nil && existing["productName"] == nil && existing["productCode"] == nil) {
+		wrap["productName"] = product
+	}
+	if len(wrap) > 0 {
+		err = errs.WrapWithFields(err, wrap)
+	}
+	logAppError(err, landingErrMsg(step))
 	_ = ctx.Response(httpTransport.MsgResponse{
 		Status:  status,
-		Payload: map[string]string{"error": err.Error()},
+		Payload: map[string]string{"error": clientErr},
 	})
+}
+
+func landingErrMsg(step string) string {
+	switch step {
+	case "init":
+		return "viva init subscription from landing failed"
+	case "confirm":
+		return "viva confirm subscription from landing failed"
+	default:
+		return "landing " + step + " failed"
+	}
+}
+
+func vivaLandingErr(message interface{}) error {
+	msg := strings.TrimSpace(strings.ToLower(fmt.Sprint(message)))
+	if msg == "" {
+		return errors.New("viva subscription rejected")
+	}
+	return errors.New(msg)
 }
 
 func (s *Viva) removeSubscription(phoneNum, productCode string) error {
