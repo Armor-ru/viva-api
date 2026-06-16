@@ -12,7 +12,7 @@ func logAppError(err error, msg string) {
 		return
 	}
 	if fields := errs.Fields(err); fields != nil {
-		logger.Error().Fields(fields).Msg(msg)
+		logger.Error().Fields(fields).Msg(msg + ", " + err.Error())
 		return
 	}
 	logger.Error().Msg(msg + ", " + err.Error())

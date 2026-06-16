@@ -39,7 +39,7 @@ func (s *Viva) landingInitHandler(ctx types.HandlerContext) {
 		landingErr(ctx, 400, errs.WrapWithFields(
 			fmt.Errorf("invalid subscription init request"),
 			map[string]interface{}{"err": err.Error()},
-		))
+		), "init", req.PhoneNum, req.ProductName)
 		return
 	}
 
@@ -48,17 +48,14 @@ func (s *Viva) landingInitHandler(ctx types.HandlerContext) {
 		landingErr(ctx, 400, errs.WrapWithFields(
 			err,
 			map[string]interface{}{"bodyPhone": req.PhoneNum},
-		))
+		), "init", req.PhoneNum, req.ProductName)
 		return
 	}
 	req.PhoneNum = phone
 
 	res, err := s.landingInit(req)
 	if err != nil {
-		landingErr(ctx, 502, errs.WrapWithFields(
-			err,
-			map[string]interface{}{"phone": req.PhoneNum, "product": req.ProductName},
-		))
+		landingErr(ctx, 502, err, "init", req.PhoneNum, req.ProductName)
 		return
 	}
 
@@ -73,7 +70,7 @@ func (s *Viva) landingConfirmHandler(ctx types.HandlerContext) {
 		landingErr(ctx, 400, errs.WrapWithFields(
 			fmt.Errorf("invalid subscription confirm request"),
 			map[string]interface{}{"err": err.Error()},
-		))
+		), "confirm", req.PhoneNum, req.ProductName)
 		return
 	}
 
@@ -82,14 +79,14 @@ func (s *Viva) landingConfirmHandler(ctx types.HandlerContext) {
 		landingErr(ctx, 400, errs.WrapWithFields(
 			err,
 			map[string]interface{}{"bodyPhone": req.PhoneNum},
-		))
+		), "confirm", req.PhoneNum, req.ProductName)
 		return
 	}
 	req.PhoneNum = phone
 
 	res, orderID, err := s.landingConfirm(req)
 	if err != nil {
-		landingErr(ctx, 502, err)
+		landingErr(ctx, 502, err, "confirm", req.PhoneNum, req.ProductName)
 		return
 	}
 
@@ -195,8 +192,13 @@ func landingPhone(ctx types.HandlerContext, bodyPhone string) (string, error) {
 	)
 }
 
-func landingErr(ctx types.HandlerContext, status int, err error) {
-	logAppError(err, "landing request failed")
+func landingErr(ctx types.HandlerContext, status int, err error, step, phone, product string) {
+	fields := map[string]interface{}{
+		"step":    step,
+		"phone":   phone,
+		"product": product,
+	}
+	logAppError(errs.WrapWithFields(err, fields), "landing "+step+" failed")
 	_ = ctx.Response(httpTransport.MsgResponse{
 		Status:  status,
 		Payload: map[string]string{"error": err.Error()},
