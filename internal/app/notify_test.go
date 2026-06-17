@@ -12,7 +12,7 @@ func TestNotify_Send(t *testing.T) {
 	tr := &fakeTransport{}
 	v := &Viva{ussdTransport: tr}
 
-	if err := v.notify("37477600552", "hello", "test"); err != nil {
+	if err := v.notify("37477600552", "1020", "hello", "test"); err != nil {
 		t.Fatalf("notify() error = %v", err)
 	}
 	if len(tr.sendCalls) != 1 {

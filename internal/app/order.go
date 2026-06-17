@@ -241,7 +241,7 @@ func (s *Viva) completeOrder(order Order) error {
 	}
 
 	if text := product.GetNotify(welcomeKey, data, lang); text != "" {
-		if err := s.notify(phone, text, welcomeKey); err != nil {
+		if err := s.notify(phone, product.ShortNumber, text, welcomeKey); err != nil {
 			return err
 		}
 	}
@@ -258,7 +258,7 @@ func (s *Viva) completeOrder(order Order) error {
 		)
 	}
 
-	if err := s.notify(phone, text, "license"); err != nil {
+	if err := s.notify(phone, product.ShortNumber, text, "license"); err != nil {
 		return err
 	}
 	logOrderCompleteDone(order.ID, phone, productCode, item.Type, welcomeKey)

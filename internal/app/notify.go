@@ -9,36 +9,37 @@ import (
 	"git.dev.armlab.pro/armor/sds-go/pkg/types"
 )
 
-func (s *Viva) notify(phone, text, notifyKey string) error {
+func (s *Viva) notify(phone, from, text, notifyKey string) error {
+
 	if s.ussdTransport == nil {
 		return errs.WrapWithFields(
 			fmt.Errorf("ussdTransport is not configured"),
 			nil,
 		)
 	}
-
 	phone = strings.TrimSpace(strings.TrimPrefix(phone, "+"))
+	from = strings.TrimSpace(from)
 	text = strings.TrimSpace(text)
-	if phone == "" || text == "" {
+	if phone == "" || from == "" || text == "" {
 		return errs.WrapWithFields(
-			fmt.Errorf("phone or text is empty"),
-			map[string]interface{}{"phone": phone, "text": text},
+			fmt.Errorf("phone, from or text is empty"),
+			map[string]interface{}{"phone": phone, "from": from, "text": text},
 		)
 	}
-
 	_, err := s.ussdTransport.Send("", map[string]interface{}{
+		"from": from,
 		"to":   phone,
 		"text": text,
 	}, types.SendOptions{})
 	if err != nil {
 		return errs.WrapWithFields(
 			fmt.Errorf("ussd transport send failed, %w", err),
-			map[string]interface{}{"phone": phone, "text": text},
+			map[string]interface{}{"phone": phone, "from": from, "text": text},
 		)
 	}
-
 	log := logger.Info().
 		Str("phone", phone).
+		Str("from", from).
 		Int("textLen", len(text)).
 		Str("text", text)
 	if notifyKey != "" {
@@ -46,6 +47,7 @@ func (s *Viva) notify(phone, text, notifyKey string) error {
 	}
 	log.Msg("smpp mt sent")
 	return nil
+
 }
 
 func (s *Viva) sendServiceDeactivated(phone, productCode string) error {
@@ -76,5 +78,5 @@ func (s *Viva) sendProductNotify(product *Product, phone, key string, data map[s
 			},
 		)
 	}
-	return s.notify(phone, text, key)
+	return s.notify(phone, product.ShortNumber, text, key)
 }
