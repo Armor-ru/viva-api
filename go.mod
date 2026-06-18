@@ -3,7 +3,7 @@ module git.dev.armlab.pro/armor/viva-api
 go 1.26.1
 
 require (
-	git.dev.armlab.pro/armor/sds-go v1.1.4
+	git.dev.armlab.pro/armor/sds-go v1.1.5-0.20260618092444-ca25d0b07193
 	github.com/go-playground/validator/v10 v10.12.0
 	github.com/gofiber/fiber/v2 v2.43.0
 	github.com/google/uuid v1.6.0
