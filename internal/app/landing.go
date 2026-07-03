@@ -40,7 +40,7 @@ func (s *Viva) landingInitHandler(ctx types.HandlerContext) {
 	logLandingInitReceived(req.PhoneNum, req.ProductName)
 
 	if err := validate.Struct(req); err != nil {
-		landingErr(ctx, 400, errs.WrapWithFields(
+		landingErr(ctx, http.StatusBadRequest, errs.WrapWithFields(
 			fmt.Errorf("invalid subscription init request"),
 			map[string]interface{}{"err": err.Error()},
 		), "init", req.PhoneNum, req.ProductName)
@@ -49,7 +49,7 @@ func (s *Viva) landingInitHandler(ctx types.HandlerContext) {
 
 	phone, err := landingPhone(ctx, req.PhoneNum)
 	if err != nil {
-		landingErr(ctx, 400, errs.WrapWithFields(
+		landingErr(ctx, http.StatusBadRequest, errs.WrapWithFields(
 			err,
 			map[string]interface{}{"bodyPhone": req.PhoneNum},
 		), "init", req.PhoneNum, req.ProductName)
@@ -59,7 +59,7 @@ func (s *Viva) landingInitHandler(ctx types.HandlerContext) {
 
 	res, err := s.landingInit(req)
 	if err != nil {
-		landingErr(ctx, 502, err, "init", req.PhoneNum, req.ProductName)
+		landingErr(ctx, http.StatusBadGateway, err, "init", req.PhoneNum, req.ProductName)
 		return
 	}
 
@@ -77,7 +77,7 @@ func (s *Viva) landingConfirmHandler(ctx types.HandlerContext) {
 	)
 
 	if err := validate.Struct(req); err != nil {
-		landingErr(ctx, 400, errs.WrapWithFields(
+		landingErr(ctx, http.StatusBadRequest, errs.WrapWithFields(
 			fmt.Errorf("invalid subscription confirm request"),
 			map[string]interface{}{"err": err.Error()},
 		), "confirm", req.PhoneNum, req.ProductName)
@@ -86,7 +86,7 @@ func (s *Viva) landingConfirmHandler(ctx types.HandlerContext) {
 
 	phone, err := landingPhone(ctx, req.PhoneNum)
 	if err != nil {
-		landingErr(ctx, 400, errs.WrapWithFields(
+		landingErr(ctx, http.StatusBadRequest, errs.WrapWithFields(
 			err,
 			map[string]interface{}{"bodyPhone": req.PhoneNum},
 		), "confirm", req.PhoneNum, req.ProductName)
@@ -96,7 +96,7 @@ func (s *Viva) landingConfirmHandler(ctx types.HandlerContext) {
 
 	res, orderID, err := s.landingConfirm(req)
 	if err != nil {
-		landingErr(ctx, 502, err, "confirm", req.PhoneNum, req.ProductName)
+		landingErr(ctx, http.StatusBadGateway, err, "confirm", req.PhoneNum, req.ProductName)
 		return
 	}
 
@@ -278,7 +278,6 @@ func landingPhone(ctx types.HandlerContext, bodyPhone string) (string, error) {
 }
 
 func landingErr(ctx types.HandlerContext, status int, err error, step, phone, product string) {
-	payload := landingErrorPayload(err)
 	existing := errs.Fields(err)
 	wrap := map[string]interface{}{}
 	if existing == nil || existing["step"] == nil {
@@ -293,6 +292,7 @@ func landingErr(ctx types.HandlerContext, status int, err error, step, phone, pr
 	if len(wrap) > 0 {
 		err = errs.WrapWithFields(err, wrap)
 	}
+	payload := landingErrorPayload(err)
 	status = landingHTTPStatus(status, err)
 	logAppError(err, landingErrMsg(step))
 	_ = ctx.Response(httpTransport.MsgResponse{
@@ -332,6 +332,8 @@ func landingHTTPStatus(fallback int, err error) int {
 		return http.StatusTooManyRequests
 	case 6, 10, 11, 13, 21:
 		return http.StatusBadGateway
+	case 3, 4, 5, 8, 14, 15, 19, 22:
+		return http.StatusUnprocessableEntity
 	default:
 		return http.StatusUnprocessableEntity
 	}

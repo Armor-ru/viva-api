@@ -43,13 +43,28 @@ func TestLandingHTTPStatus(t *testing.T) {
 	}{
 		{name: "not allowed product", resultCode: 1, want: http.StatusForbidden},
 		{name: "product not found", resultCode: 2, want: http.StatusNotFound},
+		{name: "product not allowed for subscriber state", resultCode: 3, want: http.StatusUnprocessableEntity},
+		{name: "owner changed", resultCode: 4, want: http.StatusUnprocessableEntity},
+		{name: "data profile not found", resultCode: 5, want: http.StatusUnprocessableEntity},
+		{name: "partner not found", resultCode: 6, want: http.StatusBadGateway},
 		{name: "already active", resultCode: 7, want: http.StatusConflict},
+		{name: "date passed", resultCode: 8, want: http.StatusUnprocessableEntity},
+		{name: "subscriber not found", resultCode: 9, want: http.StatusNotFound},
+		{name: "free traffic assignment failed", resultCode: 10, want: http.StatusBadGateway},
+		{name: "activation failed", resultCode: 11, want: http.StatusBadGateway},
 		{name: "invalid phone", resultCode: 12, want: http.StatusBadRequest},
+		{name: "internal error", resultCode: 13, want: http.StatusBadGateway},
 		{name: "not enough funds", resultCode: 14, want: http.StatusUnprocessableEntity},
+		{name: "subscriber inactive", resultCode: 15, want: http.StatusUnprocessableEntity},
+		{name: "invalid input", resultCode: 16, want: http.StatusBadRequest},
 		{name: "no pending subscription", resultCode: 17, want: http.StatusConflict},
+		{name: "verification not found", resultCode: 18, want: http.StatusConflict},
 		{name: "not verified", resultCode: 19, want: http.StatusUnprocessableEntity},
+		{name: "subscription not found", resultCode: 20, want: http.StatusNotFound},
 		{name: "sms not sent", resultCode: 21, want: http.StatusBadGateway},
+		{name: "prolong limit exceeded", resultCode: 22, want: http.StatusUnprocessableEntity},
 		{name: "too many requests", resultCode: 23, want: http.StatusTooManyRequests},
+		{name: "unknown result code", resultCode: 999, want: http.StatusUnprocessableEntity},
 	}
 
 	for _, tt := range tests {
