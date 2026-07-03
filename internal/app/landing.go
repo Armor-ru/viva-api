@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -277,7 +278,7 @@ func landingPhone(ctx types.HandlerContext, bodyPhone string) (string, error) {
 }
 
 func landingErr(ctx types.HandlerContext, status int, err error, step, phone, product string) {
-	clientErr := err.Error()
+	payload := landingErrorPayload(err)
 	existing := errs.Fields(err)
 	wrap := map[string]interface{}{}
 	if existing == nil || existing["step"] == nil {
@@ -292,11 +293,57 @@ func landingErr(ctx types.HandlerContext, status int, err error, step, phone, pr
 	if len(wrap) > 0 {
 		err = errs.WrapWithFields(err, wrap)
 	}
+	status = landingHTTPStatus(status, err)
 	logAppError(err, landingErrMsg(step))
 	_ = ctx.Response(httpTransport.MsgResponse{
 		Status:  status,
-		Payload: map[string]string{"error": clientErr},
+		Payload: payload,
 	})
+}
+
+func landingErrorPayload(err error) LandingErrorResponse {
+	payload := LandingErrorResponse{Error: err.Error()}
+	if resultCode, ok := landingResultCode(err); ok {
+		payload.ResultCode = &resultCode
+	}
+	return payload
+}
+
+func landingHTTPStatus(fallback int, err error) int {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return http.StatusGatewayTimeout
+	}
+
+	resultCode, ok := landingResultCode(err)
+	if !ok {
+		return fallback
+	}
+
+	switch resultCode {
+	case 1:
+		return http.StatusForbidden
+	case 2, 9, 20:
+		return http.StatusNotFound
+	case 7, 17, 18:
+		return http.StatusConflict
+	case 12, 16:
+		return http.StatusBadRequest
+	case 23:
+		return http.StatusTooManyRequests
+	case 6, 10, 11, 13, 21:
+		return http.StatusBadGateway
+	default:
+		return http.StatusUnprocessableEntity
+	}
+}
+
+func landingResultCode(err error) (int, bool) {
+	fields := errs.Fields(err)
+	if fields == nil {
+		return 0, false
+	}
+	resultCode, ok := fields["resultCode"].(int)
+	return resultCode, ok
 }
 
 func landingErrMsg(step string) string {
