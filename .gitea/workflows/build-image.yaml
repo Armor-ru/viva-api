@@ -16,6 +16,5 @@ jobs:
         uses: https://git.dev.armlab.pro/armor/sds-deploy/.gitea/actions/build-by-tag@main
         with:
           registry-url: ${{ vars.REGISTRY_URL }}
-          registry-username: ${{ secrets.REGISTRY_USERNAME }}
-          registry-password: ${{ secrets.REGISTRY_PASSWORD }}
           checkout-token: ${{ secrets.GITEA_TOKEN }}
+          yc-service-account-key-json: ${{ secrets.YC_SERVICE_ACCOUNT_KEY_JSON }}
