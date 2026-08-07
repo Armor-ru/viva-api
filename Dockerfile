@@ -27,6 +27,7 @@ RUN apk add --no-cache gcompat libc6-compat && \
     ln -s /lib/libc.so.6 /usr/lib/libresolv.so.2
 
 COPY --from=build-app ${WORK_DIR}/.dist/${APP_NAME} .
+COPY ./catalog ./catalog
 RUN chmod u+x ./${APP_NAME}
 
 ENTRYPOINT ["sh", "-c", "${WORK_DIR}/${APP_NAME}"]
