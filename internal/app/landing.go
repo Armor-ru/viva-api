@@ -14,6 +14,7 @@ import (
 	"git.dev.armlab.pro/armor/sds-go/pkg/types"
 	"git.dev.armlab.pro/armor/viva-api/internal/vivaclient"
 	"github.com/go-playground/validator/v10"
+	"github.com/spf13/cast"
 )
 
 const vivaRequestTimeout = 25 * time.Second
@@ -204,7 +205,9 @@ func (s *Viva) landingConfirm(req SubscriptionConfirm) (*vivaclient.ResponseMode
 	order, err := s.getOrder(orderID)
 	switch {
 	case err == nil && strings.TrimSpace(order.ID) != "":
-		orderType = types.OrderTypeRenew
+		if s.isActiveOrder(order) && !cast.ToBool(order.CustomData["expired"]) {
+			orderType = types.OrderTypeRenew
+		}
 	case err != nil && !strings.Contains(strings.ToLower(err.Error()), "order not found"):
 		return nil, "", errs.WrapWithFields(
 			err,
