@@ -77,15 +77,14 @@ func (s *Viva) ussd(req UssdRequest) {
 			"ShortNumber": req.ShortNumber,
 			"ExternalID":  product.ExternalId,
 		}
-		order, err := s.getOrder(s.getOrderId(req.Phone, product.ExternalId))
-		if err != nil || !s.isActiveOrder(order) {
-			logUssdStopDone(req.Phone, product.ExternalId, "already_deactivated")
-			if err := s.sendProductNotify(product, req.Phone, "already_deactivated", data, lang); err != nil {
-				logAppError(err, "notify failed")
-			}
-			return
-		}
 		if err := s.removeSubscription(req.Phone, product.ExternalId); err != nil {
+			if fields := errs.Fields(err); fields != nil && cast.ToInt(fields["resultCode"]) == 20 {
+				logUssdStopDone(req.Phone, product.ExternalId, "already_deactivated")
+				if err := s.sendProductNotify(product, req.Phone, "already_deactivated", data, lang); err != nil {
+					logAppError(err, "notify failed")
+				}
+				return
+			}
 			logAppError(err, "remove subscription failed")
 			return
 		}
