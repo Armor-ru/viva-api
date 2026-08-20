@@ -91,9 +91,12 @@ func (s *Viva) createOrder(orderType types.OrderType, phoneNum, productCode, lan
 		)
 	}
 
-	lang = strings.TrimSpace(lang)
+	lang = normalizeLangCode(lang)
 	if lang == "" {
 		lang = s.GetLang(phoneNum)
+	}
+	if lang == "" {
+		lang = defaultLang
 	}
 
 	req := types.OrderCreateRequest{
@@ -244,6 +247,7 @@ func (s *Viva) completeOrder(order Order) error {
 		if err := s.notify(phone, product.ShortNumber, text, welcomeKey); err != nil {
 			return err
 		}
+		time.Sleep(3 * time.Second)
 	}
 
 	text := product.GetNotify("license", data, lang)
@@ -278,12 +282,12 @@ func completionNotifyItem(order Order) (types.OrderItemResponse, string, bool) {
 }
 
 func orderNotifyLang(s *Viva, order Order, phone string) string {
-	lang := strings.TrimSpace(cast.ToString(order.CustomData["lang"]))
+	lang := normalizeLangCode(cast.ToString(order.CustomData["lang"]))
 	if lang == "" {
 		lang = s.GetLang(phone)
 	}
 	if lang == "" {
-		lang = "ru"
+		lang = defaultLang
 	}
 	return lang
 }

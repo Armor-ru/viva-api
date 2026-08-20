@@ -30,6 +30,9 @@ func TestCatalog_LoadAndGetNotify(t *testing.T) {
 	if got := p.GetNotify("language_changed", nil, "ru"); got != "Уважаемый абонент, язык SMS-сообщений изменен на русский. Инфо: support@kaspersky.com" {
 		t.Fatalf("GetNotify(language_changed) = %q", got)
 	}
+	if got := p.GetNotify("otp_landing", map[string]interface{}{"LandingURL": "https://safekids.viva.am/landing_1/?phone=37493215362"}); !strings.Contains(got, "Դուք փորձում եք") {
+		t.Fatalf("GetNotify(otp_landing, default) = %q", got)
+	}
 
 	p2, err := c.GetProductByExternalId("SAFEKID")
 	if err != nil {

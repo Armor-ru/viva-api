@@ -232,14 +232,22 @@ func (s *Viva) landingConfirm(req SubscriptionConfirm) (*vivaclient.ResponseMode
 		Str("orderType", string(orderType)).
 		Msg("landing order type resolved")
 
+	lang := normalizeLangCode(req.Lang)
+	if lang == "" {
+		lang = s.GetLang(req.PhoneNum)
+	}
+	if lang == "" {
+		lang = defaultLang
+	}
+
 	logger.Info().
 		Str("phone", req.PhoneNum).
 		Str("productCode", req.ProductCode).
 		Str("orderId", orderID).
 		Str("orderType", string(orderType)).
-		Str("lang", req.Lang).
+		Str("lang", lang).
 		Msg("landing order create sent")
-	if err := s.createOrder(orderType, req.PhoneNum, req.ProductCode, req.Lang); err != nil {
+	if err := s.createOrder(orderType, req.PhoneNum, req.ProductCode, lang); err != nil {
 		return nil, "", errs.WrapWithFields(
 			err,
 			map[string]interface{}{

@@ -32,7 +32,7 @@ func (s *Viva) ussd(req UssdRequest) {
 	}
 	lang := s.GetLang(req.Phone)
 	if lang == "" {
-		lang = "ru"
+		lang = defaultLang
 	}
 	switch req.Text {
 	case "1":

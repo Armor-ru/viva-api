@@ -21,9 +21,11 @@ type Product struct {
 }
 
 func (p *Product) GetNotify(key string, data map[string]interface{}, lang ...string) string {
-	l := ""
+	l := defaultLang
 	if len(lang) > 0 {
-		l = strings.TrimSpace(lang[0])
+		if normalized := normalizeLangCode(lang[0]); normalized != "" {
+			l = normalized
+		}
 	}
 
 	text := ""

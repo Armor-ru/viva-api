@@ -42,6 +42,42 @@ func TestCreateOrder_SendsRequest(t *testing.T) {
 	}
 }
 
+func TestCreateOrder_StoresSupportedLang(t *testing.T) {
+	t.Parallel()
+
+	tr := &fakeTransport{}
+	v := &Viva{
+		intTransport: tr,
+		accountId:    "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+	}
+
+	if err := v.createOrder(types.OrderTypeNew, "37477600552", "SAFEKID", "arm"); err != nil {
+		t.Fatalf("createOrder() error = %v", err)
+	}
+	req := tr.sendCalls[0].msg.(types.OrderCreateRequest)
+	if req.CustomData["lang"] != "arm" {
+		t.Fatalf("expected lang=arm, got %v", req.CustomData["lang"])
+	}
+}
+
+func TestCreateOrder_DefaultLang(t *testing.T) {
+	t.Parallel()
+
+	tr := &fakeTransport{}
+	v := &Viva{
+		intTransport: tr,
+		accountId:    "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+	}
+
+	if err := v.createOrder(types.OrderTypeNew, "37477600552", "SAFEKID", ""); err != nil {
+		t.Fatalf("createOrder() error = %v", err)
+	}
+	req := tr.sendCalls[0].msg.(types.OrderCreateRequest)
+	if req.CustomData["lang"] != "arm" {
+		t.Fatalf("expected lang=arm, got %v", req.CustomData["lang"])
+	}
+}
+
 func TestCompletionNotifyItem(t *testing.T) {
 	t.Parallel()
 

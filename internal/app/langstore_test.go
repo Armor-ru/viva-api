@@ -19,6 +19,16 @@ func TestSetLang_GetLang(t *testing.T) {
 	}
 }
 
+func TestSetLang_ignoresUnknownLang(t *testing.T) {
+	t.Parallel()
+
+	v := newLangStoreViva()
+	v.SetLang("37477600552", "hy")
+	if got := v.GetLang("37477600552"); got != "" {
+		t.Fatalf("GetLang() = %q, want empty", got)
+	}
+}
+
 func TestGetLang_normalizesPhone(t *testing.T) {
 	t.Parallel()
 

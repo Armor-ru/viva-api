@@ -57,7 +57,7 @@ func (s *Viva) sendServiceDeactivated(phone, productCode string) error {
 	}
 	lang := s.GetLang(phone)
 	if lang == "" {
-		lang = "ru"
+		lang = defaultLang
 	}
 	return s.sendProductNotify(product, phone, "service_deactivated", map[string]interface{}{
 		"Phone":       phone,

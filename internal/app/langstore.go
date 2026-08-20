@@ -12,7 +12,20 @@ type langEntry struct {
 	expiresAt time.Time
 }
 
-const langPreferenceTTL = 24 * time.Hour
+const (
+	langPreferenceTTL = 24 * time.Hour
+	defaultLang       = "arm"
+)
+
+func normalizeLangCode(lang string) string {
+	lang = strings.ToLower(strings.TrimSpace(lang))
+	switch lang {
+	case "arm", "en", "ru":
+		return lang
+	default:
+		return ""
+	}
+}
 
 func (s *Viva) GetLang(phone string) string {
 	phone = strings.TrimSpace(strings.TrimPrefix(phone, "+"))
@@ -23,12 +36,12 @@ func (s *Viva) GetLang(phone string) string {
 	if !ok || time.Now().After(e.expiresAt) {
 		return ""
 	}
-	return strings.TrimSpace(e.lang)
+	return normalizeLangCode(e.lang)
 }
 
 func (s *Viva) SetLang(phone, lang string) {
 	phone = strings.TrimSpace(strings.TrimPrefix(phone, "+"))
-	lang = strings.TrimSpace(lang)
+	lang = normalizeLangCode(lang)
 	if phone == "" || lang == "" {
 		return
 	}
