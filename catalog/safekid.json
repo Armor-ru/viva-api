@@ -1,7 +1,7 @@
 {
   "shortNumber": "1020",
   "externalId": "SAFEKID",
-  "landingConfirmUrl": "https://safekids.viva.am/landing_1/",
+  "landingConfirmUrl": "https://safekids.viva.am/",
   "notifications": {
     "ru": {
       "already_active": "Уважаемый абонент, услуга уже подключена. Инфо: support@kaspersky.com",
