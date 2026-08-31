@@ -5,9 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
 
 	"git.dev.armlab.pro/armor/sds-go/pkg/errs"
+	"git.dev.armlab.pro/armor/sds-go/pkg/types"
+	"git.dev.armlab.pro/armor/viva-api/internal/vivaclient"
 )
 
 func TestLandingErrorPayloadWithResultCode(t *testing.T) {
@@ -90,5 +94,129 @@ func TestLandingHTTPStatusTimeout(t *testing.T) {
 	err := fmt.Errorf("confirm subscription failed: %w", context.DeadlineExceeded)
 	if got := landingHTTPStatus(http.StatusBadGateway, err); got != http.StatusGatewayTimeout {
 		t.Fatalf("landingHTTPStatus() = %d, want %d", got, http.StatusGatewayTimeout)
+	}
+}
+
+func TestLandingConfirm_OrderAction(t *testing.T) {
+	future := time.Now().Add(time.Hour)
+	past := time.Now().Add(-time.Hour)
+
+	tests := []struct {
+		name          string
+		order         Order
+		getOrderErr   error
+		wantOrderType types.OrderType
+		wantCreate    bool
+	}{
+		{
+			name:          "new order",
+			getOrderErr:   errors.New("order not found"),
+			wantOrderType: types.OrderTypeNew,
+			wantCreate:    true,
+		},
+		{
+			name: "active order is reused",
+			order: Order{
+				ID:         "existing-order",
+				Status:     string(types.OrderStatusListCompleted),
+				EndTime:    &future,
+				CustomData: map[string]interface{}{},
+			},
+			wantCreate: false,
+		},
+		{
+			name: "ended order is renewed",
+			order: Order{
+				ID:         "existing-order",
+				Status:     string(types.OrderStatusListCompleted),
+				EndTime:    &past,
+				CustomData: map[string]interface{}{},
+			},
+			wantOrderType: types.OrderTypeRenew,
+			wantCreate:    true,
+		},
+		{
+			name: "expired order is renewed",
+			order: Order{
+				ID:         "existing-order",
+				Status:     string(types.OrderStatusListCompleted),
+				EndTime:    &future,
+				CustomData: map[string]interface{}{"expired": true},
+			},
+			wantOrderType: types.OrderTypeRenew,
+			wantCreate:    true,
+		},
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/auth/token":
+			_, _ = w.Write([]byte(`{"access_token":"token","expires_in":3600}`))
+		case "/api/Subscription/ConfirmSubscription":
+			_, _ = w.Write([]byte(`{"resultCode":0,"result":true}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			transport := &fakeTransport{}
+			transport.send = func(topic string, _ types.Message, _ types.SendOptions) (types.Message, error) {
+				switch topic {
+				case "order/get":
+					if tt.getOrderErr != nil {
+						return nil, tt.getOrderErr
+					}
+					return tt.order, nil
+				case "order/create":
+					return map[string]interface{}{}, nil
+				default:
+					return nil, fmt.Errorf("unexpected topic %q", topic)
+				}
+			}
+
+			v := &Viva{
+				intTransport: transport,
+				vivaClient: vivaclient.New(vivaclient.Config{
+					BaseURL:  server.URL,
+					UserName: "user",
+					Password: "password",
+				}),
+				accountId: "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+			}
+
+			_, _, err := v.landingConfirm(SubscriptionConfirm{
+				PhoneNum:    "37493215362",
+				ProductName: "SAFEKID",
+				ProductCode: "SAFEKID",
+				OTP:         "123456",
+				Lang:        "ru",
+			})
+			if err != nil {
+				t.Fatalf("landingConfirm() error = %v", err)
+			}
+
+			var createRequest *types.OrderCreateRequest
+			for _, call := range transport.sendCalls {
+				if call.topic != "order/create" {
+					continue
+				}
+				req, ok := call.msg.(types.OrderCreateRequest)
+				if !ok {
+					t.Fatalf("order/create payload type = %T", call.msg)
+				}
+				createRequest = &req
+			}
+
+			if tt.wantCreate != (createRequest != nil) {
+				t.Fatalf("order/create called = %v, want %v", createRequest != nil, tt.wantCreate)
+			}
+			if createRequest != nil && createRequest.Type != tt.wantOrderType {
+				t.Fatalf("order type = %q, want %q", createRequest.Type, tt.wantOrderType)
+			}
+		})
 	}
 }

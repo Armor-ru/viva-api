@@ -34,6 +34,7 @@ type sendCall struct {
 
 type fakeTransport struct {
 	sendCalls []sendCall
+	send      func(topic string, msg types.Message, opt types.SendOptions) (types.Message, error)
 }
 
 func (f *fakeTransport) Connect() error                       { return nil }
@@ -46,6 +47,9 @@ func (f *fakeTransport) Subscribe(topic string, h types.Handler) (types.Subscrib
 func (f *fakeTransport) Emit(topic string, msg types.Message) error { return nil }
 func (f *fakeTransport) Send(topic string, msg types.Message, opt types.SendOptions) (types.Message, error) {
 	f.sendCalls = append(f.sendCalls, sendCall{topic: topic, msg: msg})
+	if f.send != nil {
+		return f.send(topic, msg, opt)
+	}
 	return map[string]interface{}{}, nil
 }
 func (f *fakeTransport) Error(h types.ErrorHandler) {}

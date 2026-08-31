@@ -201,13 +201,20 @@ func (s *Viva) landingConfirm(req SubscriptionConfirm) (*vivaclient.ResponseMode
 		Msg("viva confirm subscription success")
 
 	orderID := s.getOrderId(req.PhoneNum, req.ProductCode)
-	orderType := types.OrderTypeNew
+	var orderType types.OrderType
 	order, err := s.getOrder(orderID)
 	switch {
 	case err == nil && strings.TrimSpace(order.ID) != "":
 		if s.isActiveOrder(order) && !cast.ToBool(order.CustomData["expired"]) {
-			orderType = types.OrderTypeRenew
+			logger.Info().
+				Str("phone", req.PhoneNum).
+				Str("productCode", req.ProductCode).
+				Str("orderId", orderID).
+				Str("orderAction", "reuse").
+				Msg("landing active order reused")
+			return res, orderID, nil
 		}
+		orderType = types.OrderTypeRenew
 	case err != nil && !strings.Contains(strings.ToLower(err.Error()), "order not found"):
 		return nil, "", errs.WrapWithFields(
 			err,
@@ -230,6 +237,7 @@ func (s *Viva) landingConfirm(req SubscriptionConfirm) (*vivaclient.ResponseMode
 		Str("productCode", req.ProductCode).
 		Str("orderId", orderID).
 		Str("orderType", string(orderType)).
+		Str("orderAction", "create").
 		Msg("landing order type resolved")
 
 	lang := normalizeLangCode(req.Lang)
