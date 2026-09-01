@@ -9,7 +9,7 @@ import (
 	"github.com/spf13/cast"
 )
 
-func (s *Viva) buildLandingConfirmURL(base, phone string) (string, error) {
+func (s *Viva) buildLandingConfirmURL(base, phone, lang string) (string, error) {
 	base = strings.TrimSpace(base)
 	if base == "" {
 		return "", fmt.Errorf("landing confirm url is empty")
@@ -20,6 +20,11 @@ func (s *Viva) buildLandingConfirmURL(base, phone string) (string, error) {
 	}
 	q := u.Query()
 	q.Set("phone", strings.TrimPrefix(strings.TrimSpace(phone), "+"))
+	lang = normalizeLangCode(lang)
+	if lang == "" {
+		lang = defaultLang
+	}
+	q.Set("lang", lang)
 	u.RawQuery = q.Encode()
 	return u.String(), nil
 }
@@ -60,7 +65,7 @@ func (s *Viva) ussd(req UssdRequest) {
 			return
 		}
 
-		landingURL, err := s.buildLandingConfirmURL(product.LandingConfirmURL, req.Phone)
+		landingURL, err := s.buildLandingConfirmURL(product.LandingConfirmURL, req.Phone, lang)
 		if err != nil {
 			logAppError(err, "build landing url failed")
 			return
