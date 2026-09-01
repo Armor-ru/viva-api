@@ -23,7 +23,7 @@ func TestSetLang_ignoresUnknownLang(t *testing.T) {
 	t.Parallel()
 
 	v := newLangStoreViva()
-	v.SetLang("37477600552", "hy")
+	v.SetLang("37477600552", "de")
 	if got := v.GetLang("37477600552"); got != "" {
 		t.Fatalf("GetLang() = %q, want empty", got)
 	}
@@ -33,12 +33,12 @@ func TestGetLang_normalizesPhone(t *testing.T) {
 	t.Parallel()
 
 	v := newLangStoreViva()
-	v.SetLang("37477600552", "arm")
-	if got := v.GetLang("+37477600552"); got != "arm" {
-		t.Fatalf("GetLang(+phone) = %q, want arm", got)
+	v.SetLang("37477600552", "hy")
+	if got := v.GetLang("+37477600552"); got != "hy" {
+		t.Fatalf("GetLang(+phone) = %q, want hy", got)
 	}
-	if got := v.GetLang(" 37477600552 "); got != "arm" {
-		t.Fatalf("GetLang(trimmed phone) = %q, want arm", got)
+	if got := v.GetLang(" 37477600552 "); got != "hy" {
+		t.Fatalf("GetLang(trimmed phone) = %q, want hy", got)
 	}
 }
 

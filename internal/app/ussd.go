@@ -105,7 +105,7 @@ func (s *Viva) ussd(req UssdRequest) {
 		case "ENG":
 			lang = "en"
 		case "ARM":
-			lang = "arm"
+			lang = "hy"
 		}
 		s.SetLang(req.Phone, lang)
 		if err := s.sendProductNotify(product, req.Phone, "language_changed", map[string]interface{}{

@@ -14,13 +14,13 @@ type langEntry struct {
 
 const (
 	langPreferenceTTL = 24 * time.Hour
-	defaultLang       = "arm"
+	defaultLang       = "hy"
 )
 
 func normalizeLangCode(lang string) string {
 	lang = strings.ToLower(strings.TrimSpace(lang))
 	switch lang {
-	case "arm", "en", "ru":
+	case "hy", "en", "ru":
 		return lang
 	default:
 		return ""
